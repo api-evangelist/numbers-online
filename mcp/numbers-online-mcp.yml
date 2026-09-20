@@ -1,0 +1,186 @@
+generated: '2026-09-19'
+method: probed
+status: published
+source: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+docs: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+repository: https://github.com/numbers-online/numbers-online-mcp
+llms_source: https://numbers.online/llms.txt
+summary: 'Numbers Online operates ONE hosted, stateless, read-only MCP server at POST https://numbers.online/api/v1/mcp (JSON-RPC 2.0 over Streamable HTTP; the provider and Vapi call the transport literal "shttp"). Anonymous initialize and tools/list succeed (200); tools/call is fail-closed behind an API key with the mcp use case. GET returns 405 (response-only, no server-initiated SSE). Nothing to install: the provider ships no stdio package.'
+deployment:
+  mode: remote
+  endpoint: https://numbers.online/api/v1/mcp
+  auth: api-key
+  verified: probed
+  note: 'A remote HTTPS endpoint an MCP client POSTs to directly. The GitHub repo numbers-online/numbers-online-mcp contains a server.json (MCP registry shape, remotes[0] streamable-http at the same URL), Vapi/Retell integration JSON and zero-dependency Node/Python reference clients — but no package, no npx/uvx install line and no stdio transport, and the README says "nothing to install or run". auth is api-key: Authorization: Bearer <nol_…> (or X-API-Key); there is no OAuth authorization server and no RFC 9728 metadata (see well-known/).'
+servers:
+- id: numbers-online
+  name: Numbers Online phone intelligence
+  endpoint: https://numbers.online/api/v1/mcp
+  transport: streamable-http
+  stateful: false
+  auth: bearer-api-key
+  auth_scope: API key with the mcp use case (every lookup-entitled self-service key has it)
+  status: live
+  probe:
+    initialize:
+      http_status: 200
+      protocol_version: '2025-06-18'
+      server_info:
+        name: numbers-online
+        title: Numbers Online phone intelligence
+        version: 1.0.0
+      capabilities:
+        tools:
+          listChanged: false
+      instructions: Read-only phone-intelligence tools. All outputs are supplementary, low-confidence signals; the calling agent keeps every routing and dialing decision.
+      fetched: '2026-09-19'
+    tools_list:
+      http_status: 200
+      anonymous: true
+      tool_count: 4
+      file: mcp/numbers-online-mcp-tools-list.json
+      fetched: '2026-09-19'
+    tools_call_anonymous:
+      http_status: 401
+      body: '{"error":"API key required. Provide via Authorization: Bearer <key> or X-API-Key header.","code":"missing_key"}'
+      note: Transport-level auth errors use the REST flat error shape, as the OpenAPI states.
+    get:
+      http_status: 405
+      body: '{"error":"Method Not Allowed. POST JSON-RPC to this endpoint."}'
+  methods:
+  - initialize
+  - notifications/initialized
+  - ping
+  - tools/list
+  - tools/call
+  tools:
+  - name: phone_lookup
+    title: Phone number intelligence
+    description: 'Return a supplementary, low-confidence intelligence bundle for a phone number: validity, formatting, line type, range carrier, country, caller name (CNAM, where available), STIR/SHAKEN verstat (supply the call''s verstat to fold it into the spam signal), a labeled spam signal, and a first-party do-not-contact (DNC) signal — a suppression preference registered by the number''s own owner, never a copy of any government registry. Advisory only — the agent keeps every routing and dialing decision.'
+    inputSchema:
+      type: object
+      properties:
+        number:
+          type: string
+          description: Phone number in E.164, e.g. +14155552671 (loose input is normalized).
+        verstat:
+          type: string
+          description: Optional STIR/SHAKEN verstat for THIS call — TN-Validation-Passed / -Failed / No-TN-Validation, or a full Identity / P-Asserted-Identity header value. When supplied it folds into the risk signal (a failed validation raises it).
+        max_cache_age_seconds:
+          type: integer
+          minimum: 0
+          description: Operator TTL control; 0 forces a fresh dip.
+      required:
+      - number
+    annotations:
+      readOnlyHint: true
+      idempotentHint: true
+      openWorldHint: true
+      title: Phone number intelligence
+    billing: bundled mcp_call rate, $0.015 on the standard tier
+  - name: line_type
+    title: Line type
+    description: Return only the deterministic fields for a number — validity, line type (mobile / fixed line / VoIP / …), range carrier, country, and formatting. No paid dip; a free, fast classification a voice agent can call before deciding to enrich.
+    inputSchema:
+      type: object
+      properties:
+        number:
+          type: string
+          description: Phone number in E.164, e.g. +14155552671 (loose input is normalized).
+      required:
+      - number
+    annotations:
+      readOnlyHint: true
+      idempotentHint: true
+      openWorldHint: true
+      title: Line type
+    billing: free (no paid dip)
+  - name: caller_risk
+    title: Caller risk signal
+    description: 'Return a labeled, low-confidence risk read for an inbound caller: a spam signal (0–100, higher = riskier), verstat passthrough, and a first-party do-not-contact (DNC) signal — without a name dip. A supplementary input to the agent''s own policy, never a verdict on whether to accept or reject the call. Supply the call''s STIR/SHAKEN verstat to fold it into the signal — a failed validation raises the risk.'
+    inputSchema:
+      type: object
+      properties:
+        number:
+          type: string
+          description: Phone number in E.164, e.g. +14155552671 (loose input is normalized).
+        verstat:
+          type: string
+          description: Optional STIR/SHAKEN verstat for THIS call — TN-Validation-Passed / -Failed / No-TN-Validation, or a full Identity / P-Asserted-Identity header value. When supplied it folds into the risk signal (a failed validation raises it).
+      required:
+      - number
+    annotations:
+      readOnlyHint: true
+      idempotentHint: true
+      openWorldHint: true
+      title: Caller risk signal
+    billing: bundled mcp_call rate, $0.015 on the standard tier
+  - name: dnc_check
+    title: Do-not-contact supplementary signal
+    description: Return a first-party do-not-contact signal (suppress / no_match / unknown) for a number, sourced ONLY from suppression preferences registered and verified by the number's own owner inside Numbers Online — never a copy of any government or licensed do-not-call registry. "suppress" = the owner asked not to be contacted on this channel; "no_match" = no suppression preference on record (absence of suppress is not consent); "unknown" = the number could not be evaluated. Comes with a signed receipt recording the status "as of T". Advisory input to the agent's own process — it does not assert that a call is lawful.
+    inputSchema:
+      type: object
+      properties:
+        number:
+          type: string
+          description: Phone number in E.164, e.g. +14155552671 (loose input is normalized).
+      required:
+      - number
+    annotations:
+      readOnlyHint: true
+      idempotentHint: true
+      openWorldHint: true
+      title: Do-not-contact supplementary signal
+    billing: free until a licensed data partner is configured (per the guide); the REST description bills the bundled rate per tool call — the free/billed split is per the docs, not observed
+  error_semantics: 'A domain miss (number not found, supplier timeout) is returned as a result with isError: true and an LLM-readable message, never a JSON-RPC error; protocol faults (unknown tool, missing argument) are JSON-RPC -32602. Source: the ai-voice-agents-mcp guide.'
+  tool_list_discrepancy: The docs page /docs/integrations/ai-voice-agents-mcp, the /integrations page and the /ai-agents prompts all advertise FIVE tools including reassigned_check. The live tools/list on 2026-09-19 returns FOUR, and the GitHub README states there is intentionally no reassigned_check tool ("Reassigned-number status is inherently a carrier/FCC dataset and is intentionally not offered as a first-party signal"). The live server and the repo README are authoritative; the four tool names also match the four A2A skill ids exactly.
+tool_count: 4
+tools:
+- name: phone_lookup
+  category: lookup
+  description: 'Return a supplementary, low-confidence intelligence bundle for a phone number: validity, formatting, line type, range carrier, country, caller name (CNAM, where available), STIR/SHAKEN verstat (supply the call''s verstat '
+  read_only: true
+- name: line_type
+  category: lookup
+  description: Return only the deterministic fields for a number
+  read_only: true
+- name: caller_risk
+  category: risk
+  description: 'Return a labeled, low-confidence risk read for an inbound caller: a spam signal (0–100, higher = riskier), verstat passthrough, and a first-party do-not-contact (DNC) signal'
+  read_only: true
+- name: dnc_check
+  category: compliance
+  description: Return a first-party do-not-contact signal (suppress / no_match / unknown) for a number, sourced ONLY from suppression preferences registered and verified by the number's own owner inside Numbers Online
+  read_only: true
+registry:
+  server_json: mcp/numbers-online-mcp-server.json
+  server_json_source: https://raw.githubusercontent.com/numbers-online/numbers-online-mcp/main/server.json
+  name: online.numbers/numbers-online
+  official_registry_listing:
+    registry: https://registry.modelcontextprotocol.io
+    query: GET /v0/servers?search=numbers-online
+    http_status: 200
+    found: true
+    listed_name: online.numbers/numbers-online
+    listed_version: 1.0.0
+    listed_title: Numbers Online — phone intelligence
+    remotes:
+    - type: streamable-http
+      url: https://numbers.online/api/v1/mcp
+    status: active
+    published_at: '2026-06-16T14:15:42.074992Z'
+    updated_at: '2026-06-16T14:15:42.074992Z'
+    is_latest: true
+    fetched: '2026-09-19'
+    note: The provider has published its server.json to the official MCP registry; the listing declares the same single streamable-http remote at https://numbers.online/api/v1/mcp and no package.
+clients_documented:
+- Vapi (MCP tool, metadata.protocol "shttp")
+- Pipecat
+- LiveKit
+- Claude Desktop / Claude Code / IDE mcp.json (type streamable-http)
+- Retell via the separate call_inbound webhook adapter (not MCP)
+integration_artifacts:
+- https://numbers.online/integrations/mcp/vapi-mcp-tool.json
+- https://numbers.online/integrations/vapi/numbers-online-tool.json
+- https://numbers.online/integrations/retell/inbound-webhook.json
+positioning: Every tool output is a supplementary, low-confidence signal; the calling agent keeps every routing and dialing decision (server instructions string and every tool description say so). Billable calls debit AFTER delivery; a hard latency backstop degrades to a neutral no-signal result rather than stalling a live call.

@@ -1,0 +1,188 @@
+generated: '2026-09-19'
+method: derived
+source: Derived from components.schemas $ref links and id/e164 reference fields in openapi/numbers-online-openapi.yml (24 schemas, 56 operations) and the object descriptions in https://numbers.online/docs. No subway/ render exists.
+docs: https://numbers.online/docs
+notation: relationships use has_one / has_many / belongs_to with the field or path segment that carries the reference; direction is from the entity that owns the reference.
+id_prefixes:
+- prefix: nol_
+  entity: ApiKey (raw key material, shown once)
+- prefix: nol_rec_
+  entity: Receipt
+- prefix: nol_bundle_
+  entity: EvidenceBundle
+- prefix: nol_edge_
+  entity: ProvenanceEdge
+entities:
+- name: Account
+  schema: Account
+  domain: account
+  identity: uuid id + the raw key (no recovery path)
+  description: Prepaid balance (microdollars), status, optional email; owns keys, verified phones, listings, tenants.
+- name: ApiKey
+  schema: ApiKeyView
+  domain: account
+  description: 'Key record: key_prefix, tier, allowed_use_cases, rate_limit, disabled (one-way), require_signed_requests, rotation_grace_expires_at; tenant_id when it is a sub-key.'
+- name: AccountPhone
+  schema: AccountPhone
+  domain: account
+  key: e164
+  description: A verified business number bound to the account via OTP; precall_enrolled toggles call-provenance.
+- name: Listing
+  schema: (inline; getAccountListing/putAccountListing)
+  domain: directory
+  key: e164
+  description: The public business profile for a verified number (name, brand, address, logo, documents, reports against it).
+- name: Tenant
+  schema: Tenant / TenantSummary
+  domain: msp
+  description: A downstream customer/site with status, usage_30d rollup and sub-keys.
+- name: TenantKey
+  schema: TenantKey
+  domain: msp
+  description: Lookup-only sub-key scoped to one tenant.
+- name: Suppression
+  schema: Suppression
+  domain: msp
+  description: Per-tenant suppressed number (stored as SHA-256 hash; label + created_at only).
+- name: LookupResult
+  schema: LookupResponse
+  domain: lookup
+  description: 'Uniform per-number read: e164, valid, formatted, line_type, carrier, country, cnam, verstat, spam_score, risk, confidence, cached, sources.'
+- name: LookupBatch
+  schema: LookupBatchResponse
+  domain: lookup
+  description: results[] of LookupResult in input order + billing summary.
+- name: RiskView
+  schema: RiskView
+  domain: lookup
+  description: '{score, level, model} — model names the scoring pipeline.'
+- name: ParsedPhoneNumber
+  schema: ParsedPhoneNumber
+  domain: parsing
+  description: Format variants (e164, national, international, rfc3966), country, type, carrier, timezones.
+- name: Country
+  schema: Country
+  domain: reference
+  description: code, name, callingCode, example numbers.
+- name: InboundAssessment
+  schema: InboundLookupResponse
+  domain: inbound
+  description: 'Signed answer-time read: identity_type, display_label, risk_score, risk, signals, recommended_action, ttl_seconds, receipt_id.'
+- name: Receipt
+  schema: Receipt
+  domain: evidence
+  description: 'Signed, PII-free record: number_hash, line_type, dnc_status, reassigned_status, context, checked_at, signed_payload, response_signature.'
+- name: EvidenceBundle
+  schema: EvidenceBundle
+  domain: evidence
+  description: Windowed aggregate of receipts with merkle_root, totals, bundle signature and public_key_url.
+- name: SbcDecision
+  schema: SbcRedirectResponse
+  domain: sbc
+  description: decision (allow/flag/redirect/block), sip {code, reason}, advisory, receipt_id.
+- name: SigningInfo
+  schema: SigningInfo
+  domain: sbc
+  description: Per-key HKDF signing secret, scheme, canonical form, required flag.
+- name: PrecallResult
+  schema: (inline; precallLookup)
+  domain: outbound
+  description: 'dnc, dnc_channel, compliance, dial_risk, cost_estimate {voice: ChannelCost, sms: ChannelCost}, provenance fields.'
+- name: ChannelCost
+  schema: ChannelCost / LaneUsd / ProviderCost
+  domain: outbound
+  description: Per-channel retail price aggregate with lane splits and a per-provider breakdown.
+- name: Report
+  schema: (inline; reportNumber)
+  domain: community
+  description: Tag-only community report spending one receipt_id; returns lane, report_id, provenance label.
+- name: ProvenanceEdge
+  schema: (server-only; edge_id in precall response)
+  domain: outbound
+  description: Hashed (from → to) call record kept 7 days; never surfaced beyond its id.
+relationships:
+- from: Account
+  to: ApiKey
+  kind: has_many
+  via: GET /api/v1/account/keys
+- from: Account
+  to: AccountPhone
+  kind: has_many
+  via: GET /api/v1/account/phones
+- from: Account
+  to: Listing
+  kind: has_many
+  via: /api/v1/account/listings/{e164}
+- from: Account
+  to: Tenant
+  kind: has_many
+  via: GET /api/v1/account/tenants
+- from: Tenant
+  to: TenantKey
+  kind: has_many
+  via: /tenants/{id}/keys
+- from: Tenant
+  to: Suppression
+  kind: has_many
+  via: /tenants/{id}/suppressions
+- from: ApiKey
+  to: Tenant
+  kind: belongs_to
+  via: tenant_id (null for account-level keys)
+- from: ApiKey
+  to: SigningInfo
+  kind: has_one
+  via: GET /api/v1/account/signing (derived, never stored)
+- from: AccountPhone
+  to: Listing
+  kind: has_one
+  via: e164
+- from: AccountPhone
+  to: ProvenanceEdge
+  kind: has_many
+  via: from (hashed) when precall_enrolled
+- from: InboundAssessment
+  to: Receipt
+  kind: has_one
+  via: receipt_id
+- from: SbcDecision
+  to: Receipt
+  kind: has_one
+  via: receipt_id
+- from: Report
+  to: Receipt
+  kind: belongs_to
+  via: receipt_id (single-use)
+- from: Report
+  to: Listing
+  kind: belongs_to
+  via: e164 (surfaced at GET /listings/{e164}/reports)
+- from: EvidenceBundle
+  to: Receipt
+  kind: has_many
+  via: receipts[] (merkle_root)
+- from: LookupBatch
+  to: LookupResult
+  kind: has_many
+  via: results[]
+- from: LookupResult
+  to: RiskView
+  kind: has_one
+  via: risk
+- from: InboundAssessment
+  to: RiskView
+  kind: has_one
+  via: risk
+- from: SbcDecision
+  to: RiskView
+  kind: has_one
+  via: advisory.risk
+- from: PrecallResult
+  to: ChannelCost
+  kind: has_many
+  via: cost_estimate.voice / cost_estimate.sms
+- from: ChannelCost
+  to: ProviderCost
+  kind: has_many
+  via: breakdown[]
+schema_versions: Every owned shape carries schema_version (see changelog/numbers-online-changelog.yml).

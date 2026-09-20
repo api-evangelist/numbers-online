@@ -1,0 +1,35 @@
+generated: '2026-09-19'
+method: derived
+source: openapi/numbers-online-openapi.yml
+summary:
+  types:
+  - apiKey
+  - http
+  api_key_in:
+  - header
+  - query
+schemes:
+- name: ApiKeyAuth
+  type: apiKey
+  in: header
+  parameter: X-API-Key
+  description: API key for authentication
+  sources:
+  - openapi/numbers-online-openapi.yml
+- name: BearerAuth
+  type: http
+  scheme: bearer
+  description: Bearer token authentication
+  sources:
+  - openapi/numbers-online-openapi.yml
+- name: CidQueryKeyAuth
+  type: apiKey
+  in: query
+  parameter: key
+  description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint
+    GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound,
+    POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms
+    set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key
+    can leak into access logs — use a dedicated, r
+  sources:
+  - openapi/numbers-online-openapi.yml

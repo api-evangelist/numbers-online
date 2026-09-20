@@ -1,0 +1,192 @@
+generated: '2026-09-19'
+method: searched
+source: 'https://numbers.online/api/spec (info.description: Authentication, Which lookup do I want, Billing observability headers, Rate Limiting, Error codes, Schema versioning, Risk models), https://numbers.online/docs, https://numbers.online/llms.txt, https://numbers.online/pricing, https://numbers.online/terms §7–§10, the precall-call-provenance and ai-voice-agents-mcp guides, and live unauthenticated probes on 2026-09-19.'
+description: 'How the Numbers Online REST API behaves across every operation: key-based auth with per-key use cases, billing-scoped idempotency, a single cursor feed, no field expansion, date-stamped per-shape versioning, a flat error envelope, pooled rate limits signalled by 429 + Retry-After, Ed25519-signed responses, and an explicit fail-open contract on every live-call path.'
+base_url: https://numbers.online
+api_style: REST over HTTPS, JSON request/response bodies (text/plain on the PBX caller-id endpoint), plus JSON-RPC 2.0 for the MCP and A2A endpoints
+canonical_paths: Long form /api/v1/* is canonical; bare /v1/* is a tolerated rewrite alias for header-less PBX URL fields only; HMAC-signed requests MUST use /api/v1/* because signing canonicalizes the long path.
+authentication:
+  scheme: 'Static API key, sent as Authorization: Bearer nol_… or X-API-Key: nol_…; ?key= accepted only on header-less endpoints (cid, sbc/redirect, retell, vapi)'
+  key_format: nol_ prefix; shown exactly once at signup/mint/rotate and stored only as a SHA-256 hash — no recovery path (the key + account UUID IS the identity)
+  use_cases: Keys are scoped to use cases (parse, lookup, inbound_lookup, scrub, precall, mcp, sbc_redirect, report, manage); a valid key on the wrong use case gets 403 use_case_forbidden, not 401
+  key_types:
+  - account-level self-service key
+  - tenant sub-key (lookup / SBC redirect / pre-call only; cannot manage, top up, enroll or report)
+  keyless:
+  - POST /api/v1/account/signup
+  - GET /api/health
+  - GET /api/spec
+  - GET /api/v1/publickey
+  - GET /api/v1/receipts/{id} (the unguessable id is the credential)
+  - MCP initialize / ping / tools/list
+  docs: https://numbers.online/docs
+  detail: authentication/numbers-online-authentication.yml
+idempotency:
+  supported: true
+  coverage: partial
+  mechanism: Idempotency-Key request header (optional)
+  semantics: 'At-most-once BILLING on retries: repeated requests with the same key are not double-billed; on scrub the key is content-scoped (same key + different number list does not dedupe). Billing headers are absent on an idempotent retry. This is a billing guarantee, not a documented response-replay or general write-deduplication contract.'
+  scope:
+  - lookupNumber
+  - lookupNumberBatch
+  - v1Scrub
+  - sbcRedirect
+  scope_note: Declared as a header parameter on exactly these 4 of the 56 operations (the four billed lookup/scrub/decision surfaces). None of the account, key, listing, tenant, suppression, enrollment or report writes declare it; the topup credit apply is described as idempotently keyed on the Stripe session id server-side.
+  key_format: client-supplied request id (format unspecified)
+  retention: null
+  conflict_behavior: null
+  docs: https://numbers.online/api/spec
+pagination:
+  style: cursor (one feed only)
+  operations:
+  - lookupChanges
+  request_params:
+    since: opaque cursor returned by the previous page; omit for the last hour
+    limit: max 1000 (use 1000 — the cursor is strict greater-than and ingest batches share timestamps, so small pages can skip rows)
+  response_fields:
+    cursor: pass as the next since
+  other_lists: GET /api/v1/account/keys, /tenants, /phones and /suppressions return unpaginated arrays; batch inputs are bounded (100 numbers per lookup/parse batch, 1,000 per scrub).
+field_expansion:
+  supported: false
+sparse_fields:
+  supported: false
+metadata:
+  supported: false
+  note: No client metadata field; inboundLookup accepts optional client_type / client_name / call_id_hash for context, not arbitrary metadata.
+request_tracing:
+  request_id_header: null
+  note: No request-id header is documented; responses carry Cloudflare cf-ray (observed). Billed responses carry X-Billed-Micros, X-Balance-Micros and X-Billing-Endpoint, sourced from the metering write; the receipt_id is the durable per-lookup identifier on signed surfaces.
+billing_signals:
+  headers:
+    X-Billed-Micros: what THIS request cost, microdollars
+    X-Balance-Micros: remaining prepaid balance after it
+    X-Billing-Endpoint: billing class, e.g. lookup vs lookup_enriched (how you observe the fresh-dip vs cache price split)
+  absent_when: nothing was debited — free/enterprise tiers, invalid numbers, idempotent retries, or when metering failed open
+  exhaustion: 402 insufficient_balance with balance_micros / topup_url / topup_min_cents; batch does a whole-batch 402 precheck
+  detail: plans/numbers-online-plans-pricing.yml
+versioning:
+  scheme: uri-path v1 + per-shape date-stamped schema_version
+  header: null
+  current: v1 / 1.0.0
+  bump_rule: additive never bumps; remove/rename/retype bumps; treat schema_version as an open string
+  detail: lifecycle/numbers-online-lifecycle.yml
+  changelog: changelog/numbers-online-changelog.yml
+error_envelope:
+  media_type: application/json
+  rfc9457: false
+  shape: '{ "error": prose, "code": enum, "retry_after_seconds"?: int }  (+ balance_micros/topup_url/topup_min_cents on 402)'
+  codes:
+  - missing_key
+  - invalid_key
+  - use_case_forbidden
+  - rate_limited_key
+  - rate_limited_pool
+  - rate_limited_ip
+  - signature_invalid
+  - insufficient_balance
+  - account_suspended
+  - paid_verification_required
+  - receipt_invalid
+  channel_exceptions: cid is text/plain UNAVAILABLE; Retell/Vapi webhooks always 200; SBC redirect fail-open allow; MCP isError results / -32602
+  detail: errors/numbers-online-problem-types.yml
+rate_limits:
+  signal_status: 429
+  headers:
+  - Retry-After (seconds)
+  body_field: retry_after_seconds
+  codes:
+  - rate_limited_key
+  - rate_limited_pool
+  - rate_limited_ip
+  model: account-pooled and business-scaled (shared across all of an account's keys; minting keys never raises them) plus a per-key 60/min default on non-pooled endpoints
+  detail: rate-limits/numbers-online-rate-limits.yml
+  docs: https://numbers.online/pricing
+caching:
+  server_headers: Cache-Control declared on lookupNumber, lookupChanges, cidLookup and cidLookupFallback responses
+  client_controls: '?max_cache_age= (lookup/cid) and max_cache_age_seconds (MCP phone_lookup; 0 forces a fresh dip); response field cached: true when CNAM came from cache (cheaper rate)'
+  contractual_bound: 'Terms §7: cache API responses for internal operational use for up to 30 days from retrieval (or any shorter stated period); drop corrected/removed records on next refresh; scrub results are one-time-use and must be re-scrubbed every 31 days (§8)'
+  refresh_hint: GET /api/v1/lookup/changes is a re-dip HINT feed, not the authoritative score
+response_signing:
+  scheme: Ed25519 (RFC 8032)
+  field: response_signature "ed25519:<base64>" over signed_payload
+  surfaces:
+  - inboundLookup
+  - getReceipt
+  - complianceEvidence
+  verification: GET /api/v1/publickey (keyless SPKI PEM; observed 200), then recompute sha256(E.164) and match number_hash
+  operator_request_signing: opt-in HMAC with X-Operator-* headers, HKDF-derived per-key secret from GET /api/v1/account/signing; enforced per key via require_signed_requests
+fail_open_contract:
+  applies_to:
+  - cidLookup
+  - cidLookupFallback
+  - sbcRedirect
+  - retellInbound
+  - vapiTool
+  - precallLookup
+  - inboundLookup
+  - MCP tools/call
+  rule: On any live-call path a slow or failing lookup returns a neutral/empty result (UNAVAILABLE, decision=allow, empty variables, UNKNOWN, isError result) and must never delay or drop a call; billing debits AFTER delivery and a metering failure never blocks a response
+  budget_hint: 'X-SBC-Budget-Ms request header (capped 5000) on sbcRedirect: decisions that overran the shim''s deadline are never billed'
+anti_enumeration: lookupNumber and inboundLookup return the same 200 shape for known, unknown, valid and invalid numbers; invalid input is 200 valid:false and unbilled.
+webhooks:
+  outbound_events: false
+  note: Numbers Online emits no outbound webhooks and publishes no AsyncAPI. The two /api/v1/integrations/* operations are INBOUND adapters that third-party voice platforms (Retell call_inbound, Vapi tool-calls) POST to. The only change-notification surface is the polled lookupChanges cursor feed. No Webhooks pointer is emitted.
+reversibility:
+  grade: verified
+  summary: The write surface is small and its reversal semantics are stated per operation in the contract; one window (key rotation grace, 24 h) is stated numerically, one action (key disable) is explicitly irreversible, and the money paths (prepaid dips, verification fees) have no API reversal.
+  surfaces:
+  - write: rotateAccountKey (POST /api/v1/account/keys/{id}/rotate)
+    reversal: The previous key keeps working for a grace window, so a rotation can be backed out by continuing to use the old key until it expires
+    window: 'default and maximum 24 h; grace_seconds: 0 kills the old key immediately (old_key_expires_at in the response)'
+    docs: https://numbers.online/api/spec
+    grade: verified
+  - write: updateAccountKey disabled:true (PATCH /api/v1/account/keys/{id})
+    reversal: null
+    window: null
+    irreversible: true
+    note: '"Disabling is ONE-WAY (a disabled key reads as invalid — rotate or mint instead of re-enabling)"; disabling the LAST enabled account-level key is refused with 409 because it would permanently brick the account and strand its balance.'
+    docs: https://numbers.online/api/spec
+    grade: documented (irreversibility stated)
+  - write: precallEnroll enrolled:true / accountPhonePatch precall_enrolled:true
+    reversal: precallEnroll with enrolled:false or PATCH precall_enrolled:false — "Revocable"; edges already recorded expire on their own
+    window: no stated deadline; recorded provenance edges live 7 days
+    docs: https://numbers.online/docs/integrations/precall-call-provenance
+    grade: documented
+  - write: setTenantStatus status:disabled (PATCH /api/v1/account/tenants/{id})
+    reversal: PATCH status:active — "re-enabling restores them" (the tenant's sub-keys)
+    window: none stated
+    docs: https://numbers.online/api/spec
+    grade: documented
+  - write: addTenantSuppression (POST …/suppressions)
+    reversal: removeTenantSuppression — DELETE the same number
+    window: none stated
+    docs: https://numbers.online/api/spec
+    grade: documented
+  - write: reportNumber (POST /api/v1/report)
+    reversal: null
+    window: null
+    note: No API withdrawal; a report about a number can be disputed by its owner via the opt-out page / email and moderated by the provider (Terms §9, /opt-out). The single-use receipt_id it consumes cannot be reused (409 receipt_invalid).
+    grade: documented (out-of-band)
+  - write: accountTopup (POST /api/v1/account/topup) and per-dip billing
+    reversal: null
+    window: null
+    note: 'No refund or void operation in the API. Idempotency-Key prevents double-billing on retries; invalid numbers, idempotent retries and overran SBC decisions are never billed. Terms §10: verification fees are refundable only if verification fails; business verification can be cancelled anytime, effective at the end of the current billing year.'
+    grade: documented (no reversal path)
+  - write: accountSignup, createAccountKey, createTenant, issueTenantKey, putAccountListing, verifyCheckout, uploadListingLogo/Document, accountVerifyPhoneConfirm
+    reversal: null
+    note: 'Create operations with no documented delete: GET /api/v1/account/phones is "Deliberately no POST and no DELETE: numbers enter exclusively via the OTP bind and leave via the reassignment lifecycle"; keys are disabled (one-way) rather than deleted; tenants are disabled, not deleted.'
+    grade: documented (no reversal path)
+  dry_run:
+    supported: false
+    note: No dry-run/test mode is documented. The free tier is unbilled but live; the site try-it widgets go through a first-party keyless demo proxy that is "an internal convenience for the website only".
+other_conventions:
+- name: Money
+  detail: Balances and billing in integer microdollars (balance_micros, X-Billed-Micros); top-ups in US cents; cost_estimate amounts are decimal USD strings.
+- name: Numbers
+  detail: E.164 in/out; cid accepts loose national/00-prefixed input; MCP tools normalize loose input.
+- name: Risk scales
+  detail: spam_score 1–99 (lookup/cid/SBC), risk_score 0–100 (inbound), dial_risk 0–100 (outbound) — deliberately not unified; risk.model names the pipeline. Banding <40 low, <70 medium, ≥70 high.
+- name: Two DNC vocabularies
+  detail: SUPPRESS/NO_MATCH/UNKNOWN = first-party owner suppression preference (scrub, outbound, MCP dnc_check); listed/not_listed/unknown = separate government/licensed compliance signal (inbound, receipts), which stays unknown until a licensed provider is configured.
+- name: Markdown negotiation
+  detail: 'Consumer/docs pages are served as text/markdown under /md/… or via Accept: text/markdown on the canonical URL (observed 200 text/markdown on /docs/integrations).'

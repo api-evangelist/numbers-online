@@ -1,0 +1,134 @@
+generated: '2026-09-19'
+method: searched
+source: https://numbers.online/api/spec — info.description "Schema versioning" / "Version changelog" table and the "Error codes" / "Risk models" additive notes; guide Published/Updated dates from https://numbers.online/md/docs/integrations/*.
+docs: https://numbers.online/api/spec
+description: 'Numbers Online publishes its changelog INSIDE the machine-readable contract: a dated schema_version table in the OpenAPI description, one date-stamped version per JSON shape, with an explicit bump rule (additive never bumps; remove/rename/retype bumps). There is no separate /changelog page (404) and no release-notes feed.'
+versioning:
+  scheme: per-shape date-stamped schema_version + uri-path v1
+  current_api_version: 1.0.0 (info.version; /api/health v1.0.0-307f43d)
+  latest_schema_version: 2026-06-23 (pre-call lookup)
+  detail: lifecycle/numbers-online-lifecycle.yml
+entries:
+- version: '2026-06-23'
+  date: '2026-06-23'
+  shape: Pre-call lookup
+  kind: breaking
+  highlights:
+  - 'cost_estimate restructured: per-channel voice + SMS rates with per-provider breakdown; supersedes the flat per-minute 2026-06-11 shape'
+- version: '2026-06-22'
+  date: '2026-06-22'
+  shape: Account phones resource
+  kind: introduced
+  highlights:
+  - introduced; the list and the PATCH share the shape
+- version: '2026-06-21'
+  date: '2026-06-21'
+  shape: Countries response
+  kind: introduced
+  highlights:
+  - introduced; v1 promotion of /api/countries
+- version: '2026-06-20'
+  date: '2026-06-20'
+  shape: Scrub response
+  kind: introduced
+  highlights:
+  - introduced; v1 promotion of /api/scrub
+- version: '2026-06-19'
+  date: '2026-06-19'
+  shape: Parse batch response
+  kind: introduced
+  highlights:
+  - introduced; v1 promotion of /api/parse/bulk
+- version: '2026-06-18'
+  date: '2026-06-18'
+  shape: Parse response
+  kind: introduced
+  highlights:
+  - introduced; v1 promotion of /api/parse minus the {success:} envelope
+- version: '2026-06-17'
+  date: '2026-06-17'
+  shape: Signup ok-body
+  kind: introduced
+  highlights:
+  - introduced; adds the structured key descriptor
+- version: '2026-06-16'
+  date: '2026-06-16'
+  shape: Key-lifecycle ok-bodies
+  kind: introduced
+  highlights:
+  - introduced; list/mint/update/rotate share the shape
+- version: '2026-06-15'
+  date: '2026-06-15'
+  shape: Account group envelope
+  kind: introduced
+  highlights:
+  - introduced; GET and PATCH share the shape
+- version: '2026-06-14'
+  date: '2026-06-14'
+  shape: Pre-call enroll ok-body
+  kind: introduced
+  highlights:
+  - introduced
+- version: '2026-06-13'
+  date: '2026-06-13'
+  shape: Report ok-body
+  kind: introduced
+  highlights:
+  - introduced
+- version: '2026-06-12'
+  date: '2026-06-12'
+  shape: Batch lookup envelope
+  kind: introduced
+  highlights:
+  - introduced
+- version: '2026-06-11'
+  date: '2026-06-11'
+  shape: Pre-call lookup
+  kind: additive
+  highlights:
+  - added dnc_channel, per-channel DNC scrub
+- version: '2026-06-06'
+  date: '2026-06-06'
+  shape: SBC advisory — also evidence bundles
+  kind: frozen
+  highlights:
+  - pre-policy collision; both frozen
+- version: '2026-06-03'
+  date: '2026-06-03'
+  shape: Lookup response — also receipts
+  kind: frozen
+  highlights:
+  - pre-policy collision; both frozen
+- version: '2026-05-31'
+  date: '2026-05-31'
+  shape: Inbound lookup response (stamped)
+  kind: introduced
+  highlights:
+  - first stamped shape
+additive_changes_without_bump:
+- date: '2026-06-11'
+  change: 'risk: { score, level, model } object added to the lookup family, the inbound lookup (inside the signed body), the SBC advisory, and as a model field on pre-call dial_risk; legacy spam_score / risk_score frozen forever'
+- date: '2026-06-12'
+  change: code (stable machine-readable enum) added to the flat error body; older errors may omit it
+- date: '2026-06-11'
+  change: 'Canonical URL form decision: long /api/v1/* paths canonical, bare /v1/* a tolerated PBX alias'
+path_lifecycle:
+- date: 2026-06-18 → 2026-06-21
+  change: v1 promotion of the parse/countries/scrub family; legacy /api/parse, /api/parse/bulk, /api/countries, /api/scrub frozen as permanent aliases (deprecated:true)
+- change: /api/v1/outbound/lookup and /api/v1/outbound/enroll became the canonical spellings; /api/v1/precall/* kept as permanent aliases (deprecated:true)
+docs_dates:
+- page: ai-voice-agents-mcp
+  published: '2026-06-03'
+  updated: '2026-06-07'
+- page: precall-call-provenance
+  published: '2026-06-05'
+  updated: '2026-06-18'
+- page: fcc-evidence-bundle
+  published: '2026-06-03'
+  updated: '2026-06-15'
+- page: privacy
+  updated: '2026-05-30'
+- page: terms
+  updated: '2026-08-29'
+- page: cookies / opt-out
+  updated: '2026-05-30'

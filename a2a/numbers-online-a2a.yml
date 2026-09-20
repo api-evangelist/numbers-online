@@ -1,0 +1,166 @@
+generated: '2026-09-19'
+method: probed
+source: https://numbers.online/.well-known/agent-card.json
+card:
+  file: a2a/numbers-online-agent-card.json
+discovery:
+  path: /.well-known/agent-card.json
+  canonical: true
+  host: numbers.online
+  also_served_at:
+  - https://numbers.online/.well-known/agent.json (legacy pre-0.3 path, byte-identical)
+  - 'https://numbers.online/api/agent-card (robots.txt carve-out: "Allow: /api/agent-card" under "Disallow: /api/")'
+  - 'https://www.numbers.online/.well-known/agent-card.json (200, 3,410 bytes vs 3,394 — the same card with www.numbers.online substituted into its four URL fields: url, documentationUrl, iconUrl and provider.url; the apex copy is canonical)'
+  note: 'Ownership is not in question: the card is served from the same apex host as the OpenAPI (servers[0] https://numbers.online), provider.organization is "Numbers Online" with provider.url https://numbers.online, documentationUrl is the provider docs, the four skill ids are exactly the four tool names the live MCP tools/list returns, and the provider robots.txt names the card as an agent-discovery surface.'
+x-evidence:
+  fetched: '2026-09-19'
+  url: https://numbers.online/.well-known/agent-card.json
+  http_status: 200
+  content_type: application/json
+  body_bytes: 3394
+  body_parses_as: JSON object with AgentCard shape (name, url, version, protocolVersion, capabilities, skills, securitySchemes all present)
+  corroborating_probes:
+  - url: https://numbers.online/.well-known/agent.json
+    http_status: 200
+    note: identical bytes
+  - url: https://numbers.online/api/agent-card
+    http_status: 200
+    note: identical bytes
+  - url: https://numbers.online/api/v1/a2a
+    method: GET
+    http_status: 405
+    body: '{"error":"Method Not Allowed. POST JSON-RPC to this endpoint."}'
+    note: The declared A2A interface exists and expects the JSONRPC POST the card declares.
+  - url: https://numbers.online/api/v1/a2a
+    method: POST message/send (anonymous)
+    http_status: 401
+    body: '{"error":"API key required. Provide via Authorization: Bearer <key> or X-API-Key header.","code":"missing_key"}'
+    note: The endpoint is key-gated exactly as the card's securitySchemes/security declare (bearer API key with the mcp use case). A callable, auth-gated agent surface — not a documentation page.
+  - url: https://numbers.online/.well-known/numbers-online-negative-control-7c2e91af.json
+    http_status: 404
+    note: negative control — the host does not echo /.well-known/* requests
+agent_card:
+  name: Numbers Online — phone intelligence
+  description: 'Read-only phone intelligence for AI agents: validity, line type, range carrier, country, caller name (CNAM), STIR/SHAKEN verstat, a labeled spam signal, and a first-party do-not-contact (DNC) signal, with Ed25519-signed receipts. Every field is a supplementary, low-confidence signal; the calling agent keeps every routing and dialing decision.'
+  version: 1.0.0
+  protocol_version: 0.3.0
+  url: https://numbers.online/api/v1/a2a
+  preferred_transport: JSONRPC
+  documentation_url: https://numbers.online/docs
+  icon_url: https://numbers.online/android-chrome-512x512.png
+  provider:
+    organization: Numbers Online
+    url: https://numbers.online
+  capabilities:
+    streaming: false
+    pushNotifications: false
+    stateTransitionHistory: false
+  default_input_modes:
+  - text/plain
+  default_output_modes:
+  - application/json
+  - text/plain
+  security_schemes:
+    apiKey:
+      type: http
+      scheme: bearer
+      description: A Numbers Online API key with the agent (mcp) use case. Get one at numbers.online.
+  security:
+  - apiKey: []
+  skill_count: 4
+  skills:
+  - id: phone_lookup
+    name: Phone number intelligence
+    tags:
+    - phone
+    - telephony
+    - caller-id
+    - cnam
+    - line-type
+    - spam
+    - dnc
+    - e164
+    examples:
+    - Look up +14155552671
+    - What do you know about +442071838750?
+    input_modes:
+    - text/plain
+    output_modes:
+    - application/json
+    - text/plain
+  - id: line_type
+    name: Line type
+    tags:
+    - phone
+    - line-type
+    - carrier
+    - e164
+    examples:
+    - Is +14155552671 a mobile or landline?
+    input_modes:
+    - text/plain
+    output_modes:
+    - application/json
+    - text/plain
+  - id: caller_risk
+    name: Caller risk signal
+    tags:
+    - phone
+    - spam
+    - risk
+    - stir-shaken
+    - dnc
+    examples:
+    - How risky is an inbound call from +14155552671?
+    input_modes:
+    - text/plain
+    output_modes:
+    - application/json
+    - text/plain
+  - id: dnc_check
+    name: Do-not-contact supplementary signal
+    tags:
+    - phone
+    - dnc
+    - tcpa
+    - suppression
+    - consent
+    examples:
+    - Has +14155552671 registered a do-not-contact preference?
+    input_modes:
+    - text/plain
+    output_modes:
+    - application/json
+    - text/plain
+conformance:
+  spec: A2A 1.0.0 hard checks, applied to a 0.3.0-declared card
+  grade: conformant
+  protocol_version: 0.3.0
+  preferred_transport: JSONRPC
+  hard_checks:
+    capabilities_is_object: true
+    protocol_version_present: true
+    skills_is_array: true
+  optional_fields:
+    preferred_transport: true
+    default_input_modes: true
+    default_output_modes: true
+  grade_basis: 'capabilities is an OBJECT with streaming, pushNotifications and stateTransitionHistory booleans (pass). protocolVersion is present at the top level as "0.3.0" (pass). skills is an ARRAY of four fully-populated skills, each with id, name, description, tags, examples, inputModes and outputModes (pass). All three optional discriminators are present: preferredTransport JSONRPC, defaultInputModes [text/plain], defaultOutputModes [application/json, text/plain]. The card is internally consistent with the live endpoint: url points at /api/v1/a2a, which answers 405 on GET and 401 missing_key on an anonymous JSON-RPC POST, matching the declared bearer security.'
+  deviations:
+  - field: protocolVersion / url / preferredTransport
+    observed: 0.3.0-era top-level triple rather than the A2A 1.0.0 supportedInterfaces[] shape
+    note: Valid for the version the card declares. A reader written strictly against 1.0.0 that looks only for supportedInterfaces[] will find none; a 0.3-aware reader finds everything. Recorded because both shapes coexist in the catalog, not as an error.
+  - field: securitySchemes.apiKey
+    observed: 'key named apiKey but typed {type: http, scheme: bearer}'
+    note: The scheme is an HTTPAuthSecurityScheme carrying an API key as a bearer token; the name is cosmetic. The description states the key needs the "mcp" use case.
+  - field: skills[].security
+    observed: 'absent; only a top-level security: [{apiKey: []}]'
+    note: Every skill inherits the card-level requirement, which is correct for a uniformly key-gated surface, but no per-skill scopes/use-cases are expressed.
+  - field: signatures / additionalInterfaces / supportsAuthenticatedExtendedCard
+    observed: absent
+    note: No JWS signature block, so the card's authenticity rests on TLS to numbers.online. No extended card and no alternative transports declared.
+  - field: A2A endpoint vs OpenAPI
+    observed: POST /api/v1/a2a is not among the 56 operations in /api/spec, while POST /api/v1/mcp (mcpRpc) is
+    note: The A2A surface is a live endpoint that the REST contract does not describe. An agent that discovers the API via the OpenAPI will not learn the A2A endpoint exists; one that discovers it via the card will.
+surface_relationship:
+  note: 'Numbers Online publishes three agent-facing surfaces over one read-only lookup core. A2A: four skills at https://numbers.online/api/v1/a2a. MCP: the same four capabilities as tools at https://numbers.online/api/v1/mcp (public tools/list, key-gated tools/call; see mcp/numbers-online-mcp.yml). REST: 56 operations at https://numbers.online (see openapi/). The A2A skill ids and the MCP tool names are identical (phone_lookup, line_type, caller_risk, dnc_check), so the card is a faithful projection of the MCP tool set, and both are a narrow read-only subset of the REST contract (no account, key, tenant, report, SBC or evidence operations).'

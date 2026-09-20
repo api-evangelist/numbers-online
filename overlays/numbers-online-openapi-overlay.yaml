@@ -1,0 +1,146 @@
+overlay: 1.0.0
+info:
+  title: API Evangelist enhancements for the Numbers Online Phone Intelligence API
+  version: 1.0.0
+  x-generated: '2026-09-19'
+  x-method: generated
+  x-source: Authored by API Evangelist from the harvested contract (openapi/_original/numbers-online-openapi.json) and the provider docs; every annotation restates something the provider states in its own description text. The original is never mutated.
+extends: openapi/numbers-online-openapi.yml
+actions:
+- target: $.info
+  update:
+    x-apievangelist-tags:
+    - Phone Intelligence
+    - Caller ID
+    - CNAM
+    - Do Not Call
+    - STIR/SHAKEN
+    - Telephony
+    - MCP
+    - agent-native
+    x-apievangelist-artifacts:
+      authentication: authentication/numbers-online-authentication.yml
+      conventions: conventions/numbers-online-conventions.yml
+      errors: errors/numbers-online-problem-types.yml
+      lifecycle: lifecycle/numbers-online-lifecycle.yml
+      rate_limits: rate-limits/numbers-online-rate-limits.yml
+      mcp: mcp/numbers-online-mcp.yml
+      a2a: a2a/numbers-online-a2a.yml
+- target: $.servers[?(@.url=='http://localhost:3000')]
+  update:
+    x-environment: development
+    x-apievangelist-note: Local development server carried in the provider spec; not a public host.
+- target: $.servers[?(@.url=='https://numbers.online')]
+  update:
+    x-environment: production
+    x-a2a-endpoint: https://numbers.online/api/v1/a2a
+    x-agent-card: https://numbers.online/.well-known/agent-card.json
+    x-llms-txt: https://numbers.online/llms.txt
+- target: $.paths['/api/v1/lookup/{e164}'].get
+  update:
+    x-idempotency:
+      header: Idempotency-Key
+      semantics: at-most-once billing on retries (content-scoped)
+      required: false
+- target: $.paths['/api/v1/lookup/batch'].post
+  update:
+    x-idempotency:
+      header: Idempotency-Key
+      semantics: at-most-once billing on retries (content-scoped)
+      required: false
+- target: $.paths['/api/v1/scrub'].post
+  update:
+    x-idempotency:
+      header: Idempotency-Key
+      semantics: at-most-once billing on retries (content-scoped)
+      required: false
+- target: $.paths['/api/v1/sbc/redirect'].post
+  update:
+    x-idempotency:
+      header: Idempotency-Key
+      semantics: at-most-once billing on retries (content-scoped)
+      required: false
+- target: $.paths['/api/v1/cid/{number}'].get
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/cid'].get
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/sbc/redirect'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/integrations/retell/inbound'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/integrations/vapi/tool'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/outbound/lookup'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/precall/lookup'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/inbound/lookup'].post
+  update:
+    x-fail-open: true
+    x-apievangelist-note: 'Provider states this live-call-path operation fails open: a slow or failing lookup returns a neutral result and never delays or drops a call.'
+- target: $.paths['/api/v1/precall/lookup'].post
+  update:
+    x-alias-of: precallLookup
+    x-canonical-path: /api/v1/outbound/lookup
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/v1/precall/enroll'].post
+  update:
+    x-alias-of: precallEnroll
+    x-canonical-path: /api/v1/outbound/enroll
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/parse'].post
+  update:
+    x-alias-of: v1Parse
+    x-canonical-path: /api/v1/parse
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/parse/bulk'].post
+  update:
+    x-alias-of: v1ParseBatch
+    x-canonical-path: /api/v1/parse/batch
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/countries'].get
+  update:
+    x-alias-of: v1Countries
+    x-canonical-path: /api/v1/countries
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/scrub'].post
+  update:
+    x-alias-of: v1Scrub
+    x-canonical-path: /api/v1/scrub
+    x-sunset: null
+    x-apievangelist-note: Provider marks this deprecated:true but states it is a frozen PERMANENT alias kept forever; no Sunset date is published.
+- target: $.paths['/api/v1/mcp'].post
+  update:
+    x-mcp:
+      transport: streamable-http
+      public_methods:
+      - initialize
+      - ping
+      - tools/list
+      gated_methods:
+      - tools/call
+      tools:
+      - phone_lookup
+      - line_type
+      - caller_risk
+      - dnc_check
+      manifest: mcp/numbers-online-mcp.yml

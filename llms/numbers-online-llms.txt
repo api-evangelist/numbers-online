@@ -1,0 +1,114 @@
+# Numbers Online
+
+> A phone-number trust & intelligence API. Given a number in E.164, it returns a caller name
+> (CNAM) where available and a supplementary, low-confidence spam-risk signal, plus
+> compliance-aid checks (do-not-call scrub, DNC / reassigned status) and signed receipts.
+> It is built for softphones, PBXs, SBCs, AI voice agents, chatbots, and CRMs.
+
+## What it is (and is not)
+
+- Every risk read is a **supplementary, low-confidence signal** — never an assertion that a call
+  is "safe", "spam", lawful, or unlawful. A missing name means "unknown", not a negative signal.
+- On any live-call path the API **fails open**: a slow or failing lookup returns a neutral/empty
+  result and must never delay or drop a call.
+- The integrating operator/agent keeps **every** routing, labeling, blocking, and dialing
+  decision and remains responsible for compliance. Do-not-call results are a compliance aid, not
+  a legal determination; `NO_MATCH` is not a consent grant.
+
+## Base URL & authentication
+
+- Base URL: `https://numbers.online`
+- Canonical paths are the LONG form `/api/v1/*`. The bare `/v1/*` spelling is a tolerated
+  rewrite alias for header-less PBX URL fields only; HMAC-signed operator requests MUST use
+  `/api/v1/*` (the signature canonicalizes the long path).
+- Auth header (preferred): `Authorization: Bearer <API_KEY>`  — or `X-API-Key: <API_KEY>`.
+- Query-param auth `?key=<API_KEY>` is accepted only on header-less endpoints:
+  `/api/v1/cid/{number}`, `/api/v1/integrations/retell/inbound`,
+  `/api/v1/integrations/vapi/tool`, `/api/v1/sbc/redirect`.
+- Keys are self-service: sign up at `https://numbers.online/docs`. A key is shown exactly once
+  and stored only as a SHA-256 hash. Free tier is rate-limited; standard tier is prepaid.
+- Key lifecycle: `GET/POST /api/v1/account/keys` (list / mint — minted keys can only hold a
+  subset of the minter's use cases), `PATCH /api/v1/account/keys/{id}` (`disabled: true` is
+  one-way), `POST /api/v1/account/keys/{id}/rotate` (in-place rotation; the old key keeps
+  working for up to 24 h — `grace_seconds: 0` kills it immediately). These require the
+  `manage` use case, which every self-service key holds unless deliberately narrowed.
+- Errors are flat JSON: `{ "error": "<prose>", "code": "<stable enum>" }` — switch on `code`
+  (e.g. `invalid_key`, `use_case_forbidden` (403), `rate_limited_pool`, `insufficient_balance`).
+
+## Core endpoints
+
+- `GET  /api/v1/lookup/{e164}` — JSON lookup. Fields: `valid`, `formatted`, `line_type`,
+  `carrier`, `country`, `cnam`, `verstat`, `spam_score` (1-99, may be null), `confidence`,
+  `cached`. Invalid input returns 200 with `valid:false`. (No receipt is minted here —
+  receipts come from `POST /api/v1/inbound/lookup`.)
+- `POST /api/v1/lookup/batch` — up to 100 numbers: `{ "numbers": ["+1...", ...] }`.
+- `GET  /api/v1/cid/{number}` — plain-text caller name for PBX CNAM (or `UNAVAILABLE`). Optional
+  `?spam_tag=Spam?&spam_threshold=80&country=US&key=<API_KEY>`.
+- `POST /api/v1/inbound/lookup` — inbound-call intelligence. Body `{ "number", "context"?,
+  "verstat"?, "attestation"? }`. Fields: `identity_type`, `display_label` (never a personal
+  name), `risk_level`, `recommended_action`, `signals`, `receipt_id`, `response_signature`.
+- Every scoring surface also carries `risk: { score, level, model }` — `model` says which
+  pipeline scored it (`first_party_plus_restricted_sources` on lookup/cid/SBC,
+  `first_party_plus_external` on inbound, `dial_structural` on pre-call `dial_risk`). The
+  legacy `spam_score` / `risk_score` fields are frozen and stay.
+- `POST /api/v1/mcp` — Model Context Protocol server (JSON-RPC 2.0 over Streamable HTTP,
+  protocol "shttp"). Tools: `phone_lookup`, `line_type`, `caller_risk`, `dnc_check` (the DNC
+  tool is the FIRST-PARTY owner-suppression scrub, not a government signal). `tools/list` is
+  public; `tools/call` needs a key.
+- `POST /api/v1/integrations/retell/inbound` — Retell `call_inbound` webhook (always 200; injects
+  dynamic variables). `POST /api/v1/integrations/vapi/tool` — Vapi custom-function tool.
+- `POST /api/v1/outbound/lookup` — outbound pre-call do-not-call scrub: `SUPPRESS` / `NO_MATCH` /
+  `UNKNOWN` (`NO_MATCH` is not consent). `POST /api/v1/outbound/enroll` — enrol your own verified
+  number for call-provenance / spoofing defence. The original `/api/v1/precall/lookup` and
+  `/api/v1/precall/enroll` paths stay permanent aliases (same handlers).
+- `GET /api/v1/account/phones` — the verified numbers bound to your account with their enrollment
+  state; `PATCH /api/v1/account/phones/{e164}` with `{"precall_enrolled": true|false}` is the
+  resource-shaped enrollment toggle (strict update; numbers are only ever created by the OTP bind).
+- Two DISTINCT "DNC" vocabularies: `SUPPRESS`/`NO_MATCH`/`UNKNOWN` is the FIRST-PARTY
+  suppression-preference scrub (verified owners' stated preferences) — what `/api/v1/scrub`,
+  `/api/v1/outbound/lookup` AND the MCP `dnc_check` tool return; `not_listed`/`listed`/`unknown`
+  (`compliance.dnc_status`, on `/api/v1/inbound/lookup` + signed receipts) is the separate
+  government/licensed signal, which stays `unknown` until a government/licensed data provider is
+  configured. They answer different questions — do not treat one as the other.
+- `POST /api/v1/scrub` — list scrubbing, up to 1,000 numbers. `POST /api/v1/parse` — free E.164
+  parse (`/api/v1/parse/batch` for up to 100; `GET /api/v1/countries` for the reference list).
+  The old `/api/scrub`, `/api/parse`, `/api/parse/bulk`, `/api/countries` paths remain as frozen
+  legacy aliases (the parse family there wraps responses in a `{success:}` envelope).
+
+## Which lookup do I want?
+
+| endpoint | direction | you get | side effects | price (standard) | failure mode | response auth |
+|---|---|---|---|---|---|---|
+| `GET /api/v1/lookup/{e164}` | inbound (or any) | validity, line type, carrier, CNAM, `risk{}` | none | $0.004 fresh CNAM dip / $0.002 without | pooled 429 + Retry-After; prepaid 402 | unsigned |
+| `POST /api/v1/lookup/batch` | bulk (≤100) | same per number + summary | none | same, per number | pooled 429; whole-batch 402 precheck | unsigned |
+| `POST /api/v1/inbound/lookup` | inbound, answer-time | identity type, display label, action hint, full-blend `risk{}` | mints a single-use `receipt_id` | $0.004 | pooled 429; 402; fail-open neutral body | Ed25519-signed + receipt |
+| `POST /api/v1/outbound/lookup` | outbound, pre-dial | DNC scrub + `dial_risk` | provenance edge when `from` is enrolled | free (bundled) | fair-use pool 429; fail-open UNKNOWN | unsigned |
+| `GET /api/v1/cid/{number}` | inbound, PBX | plain-text caller name | none | same as lookup | every failure is the text `UNAVAILABLE` | plain text |
+| `POST /api/v1/sbc/redirect` | inbound, SIP edge | 302 SIP redirect decision | none | $0.010 | fail-open `allow` — never blocks a call | unsigned |
+| `POST /api/v1/mcp` | AI agents | lookup/risk/DNC tools (JSON-RPC) | per-tool | $0.015 per tool call | JSON-RPC errors | unsigned |
+
+On live call paths, prefer the fail-open rows (cid, sbc, outbound). Every risk read on every row
+is a supplementary, low-confidence signal — never a verdict.
+
+## Markdown mirrors of the consumer site
+
+The main consumer content pages — home, per-number lookups, country hubs, trend reports,
+and the integration guides — are also served as plain markdown. Request the canonical HTML
+URL with `Accept: text/markdown`, or fetch the `/md/...` mirror directly:
+
+- `https://numbers.online/md` — site overview + corpus stats
+- `https://numbers.online/md/lookup/{e164-digits}` — per-number lookup: trust/risk signal, community reports, third-party feed evidence, carrier & line-type facts (digits only, no "+")
+- `https://numbers.online/md/browse` and `/md/browse/{cc}` — reported phone numbers by country
+- `https://numbers.online/md/reports` and `/md/reports/{YYYY-MM}` — monthly phone-spam trend reports (frozen publish-time snapshots)
+- `https://numbers.online/md/docs/integrations` and `/md/docs/integrations/{slug}` — the integration guides in their source markdown
+
+Every consumer risk figure in these mirrors is a supplementary, low-confidence signal —
+advisory, never a verdict.
+
+## Authoritative references
+
+- OpenAPI 3 spec (source of truth for every field & response code): `https://numbers.online/api/spec`
+- Copy-paste AI-agent integration prompts: `https://numbers.online/ai-agents`
+- Drop-in artifacts & step-by-step guides: `https://numbers.online/integrations`
+- API reference & key signup: `https://numbers.online/docs`
+- Pricing & rate limits: `https://numbers.online/pricing`

@@ -1,0 +1,92 @@
+generated: '2026-09-19'
+method: searched
+probe: true
+source: https://numbers.online/privacy (last updated 30 May 2026), https://numbers.online/opt-out, https://numbers.online/terms (29 August 2026), https://numbers.online/cookies, https://numbers.online/trust, https://numbers.online/trust/scoring, plus live probes of the conventional paths.
+operator:
+  legal_entity: Evergrow Management Pte. Ltd.
+  registration: Singapore UEN 202524252D
+  registered_office: '51 Lorong 21 Geylang, #04-03, Space 21, Singapore 388466'
+  role: data controller for the directory, risk scores, verification and accounts; processor for B2B customers' submitted scrub lists
+  regimes_named_by_provider:
+  - Singapore PDPA (home jurisdiction, incl. the national DNC Registry)
+  - EU/UK GDPR
+  - California CCPA/CPRA
+  contact_note: Email addresses on the served pages are Cloudflare-obfuscated ([email protected]) in the HTML; the privacy policy names a privacy/DSR mailbox and a Data Protection Officer mailbox; the GitHub org lists contact@numbers.online.
+probed_paths:
+- url: https://numbers.online/accessibility
+  status: 404
+- url: https://numbers.online/legal/subprocessors
+  status: 404
+- url: https://numbers.online/legal/dpa
+  status: 404
+- url: https://numbers.online/security
+  status: 404
+- url: https://numbers.online/.well-known/security.txt
+  status: 404
+- url: https://numbers.online/trust
+  status: 200
+  note: trust & safety principles page — no certifications, no subprocessor table, no DPA
+- url: https://numbers.online/opt-out
+  status: 200
+- url: https://numbers.online/privacy
+  status: 200
+- url: https://numbers.online/cookies
+  status: 200
+signals:
+  data_subject_request:
+    url: https://numbers.online/opt-out
+    section: Privacy policy §13 "Your rights and choices" + the Data removal & opt-out page
+    channel: privacy/DSR email named in the privacy policy (obfuscated in the served HTML) and the /opt-out page; no API endpoint
+    stated_sla: we aim to respond within 30 days
+    rights_named:
+    - access
+    - correction
+    - deletion / erasure
+    - restriction
+    - objection (incl. to legitimate-interest processing)
+    - portability
+    - withdrawal of consent
+    - CCPA right to know / delete / correct / opt out of sale or sharing (provider states it does not sell or share)
+    identity_verification: We will verify your identity before acting on a request … To protect you, we may confirm you actually control the number before we act
+    fee: free — "Exercising your rights is free, and we will never penalise you for it"; opt-out actions are free and need no account
+    escalation:
+    - PDPC (Singapore)
+    - EU/EEA supervisory authority or UK ICO
+    - California Attorney General
+    evidence:
+    - source: https://numbers.online/privacy
+      http_status: 200
+      fetched: '2026-09-19'
+      quote: '"Depending on where you live, you have the right to access the personal data we hold about you, to correct it, to delete or erase it, to restrict or object to certain processing … to receive a portable copy of data you provided, and to withdraw any consent you have given. … We will verify your identity before acting on a request, and we aim to respond within 30 days. Exercising your rights is free, and we will never penalise you for it."'
+    - source: https://numbers.online/opt-out
+      http_status: 200
+      fetched: '2026-09-19'
+      quote: '"You can ask us to hide your number from public search, correct or remove reports, and flag it as do-not-contact. … These actions are free, and you do not need an account with us to request them. You only need to be able to show that the number is yours."'
+    note: A documented request process with named rights, a response period, identity verification, a fee statement and regulator escalation, plus a dedicated removal page for non-customers whose numbers appear in the directory. No self-service form or API; the intake channel is email.
+  notice_and_action:
+    url: https://numbers.online/opt-out
+    section: '"Remove or correct community reports" + Terms §9 dispute route'
+    substance: A published mechanism for a number's owner to notify the provider of user-generated content (community spam/scam reports) that is inaccurate, outdated or bad-faith and have it corrected or removed after review, with identity confirmation and a stated human-in-the-loop.
+    evidence:
+    - source: https://numbers.online/opt-out
+      http_status: 200
+      fetched: '2026-09-19'
+      quote: '"Community reports are written by other users … If a report about your number is inaccurate, outdated, or was submitted in bad faith, you can dispute it. Where appropriate we will correct it or remove it, and we always reserve the right to moderate reports on our platform."'
+    - source: https://numbers.online/terms
+      http_status: 200
+      fetched: '2026-09-19'
+      quote: '"A Subject who believes a report is inaccurate or unfair may dispute it and request correction by contacting [privacy email]; we will review and, where appropriate, correct or remove it."'
+    note: Scoped to reports about the requester's own number (the only UGC the platform hosts); no general "report illegal content" form, no statement of DSA statement-of-reasons or counter-notice steps. Recorded because the substance — a defined notice → review → removal path — is published, not because the provider names the DSA.
+signals_checked_and_absent:
+  sbom: no /security, /security/sbom or security.txt; no SBOM named anywhere
+  support_lifetime: no stated support period; aliases are "kept forever" (a deprecation posture, not a product support lifetime — recorded in lifecycle/, not here)
+  accessibility_conformance: /accessibility 404; no VPAT or WCAG statement found
+  training_data_summary: none
+  ai_transparency: NOT recorded. The provider publishes an automated-risk-score transparency page (/trust/scoring) and a GDPR Art. 22 statement (privacy §6, terms §6) with a human-in-the-loop and contest route — that is algorithmic/ADM transparency, not the AI-interaction or AI-generated-content disclosure the AI Act Art. 50 / Utah signal means, so it is left out rather than over-claimed.
+  global_privacy_control: no GPC / Sec-GPC / Do Not Track statement on the privacy or cookie pages (the cookie notice states no third-party advertising or tracking cookies and no sale of data, which is not a GPC commitment)
+  subprocessors: privacy §9 names CATEGORIES only (cloud hosting, payment processor, OTP/messaging providers); no named, dated subprocessor table; /legal/subprocessors 404
+  data_residency: '"We operate from Singapore" and SCCs for transfers — a transfer statement, not a residency commitment or region choice'
+  incident_notification: no stated notification SLA; /legal/dpa 404
+  age_assurance: 18+ statement only (terms §1, privacy §15); no age-assurance mechanism documented
+  transparency_report: none
+  exit_assistance: none (portability is listed as a data-subject right above; no export tooling)

@@ -1,0 +1,237 @@
+generated: '2026-09-19'
+method: derived
+format: flat-json
+source: Derived from the 4xx/5xx responses across all 56 operations in openapi/numbers-online-openapi.yml and the shared components.schemas.Error / InsufficientBalance / components.responses.RateLimited, enriched with the "Error codes" table in the spec info.description (also mirrored in https://numbers.online/llms.txt). The spec has no application/problem+json and no in-spec examples.
+envelope:
+  media_type: application/json
+  rfc9457: false
+  shape: '{ "error": "<human prose>", "code": "<stable enum>", "retry_after_seconds"?: int }'
+  extra_on_402: balance_micros, topup, topup_url, topup_min_cents (InsufficientBalance schema)
+  legacy_note: 'Only the frozen pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries) adds a legacy "success": false field; v1 routes return only error/code.'
+  switch_on: code — never the prose. code was added 2026-06-12 (additive); older errors may omit it.
+observed:
+  anonymous_GET /api/v1/lookup/+14155552671:
+    status: 401
+    body:
+      error: 'API key required. Provide via Authorization: Bearer <key> or X-API-Key header.'
+      code: missing_key
+  anonymous_POST /api/v1/mcp tools/call:
+    status: 401
+    code: missing_key
+    note: MCP transport-level auth errors use this same flat shape
+  anonymous_GET /api/v1/cid/12025550123:
+    status: 401
+    content_type: text/plain
+    body: UNAVAILABLE
+  GET /api/v1/receipts/<bogus>:
+    status: 404
+    body:
+      error: Not found.
+    note: no code field on this 404
+codes:
+- code: missing_key
+  status: 401
+  meaning: No API key in the request
+  remediation: 'Send Authorization: Bearer nol_… or X-API-Key (or ?key= on the header-less PBX/webhook endpoints).'
+- code: invalid_key
+  status: 401
+  meaning: Key unknown (or revoked — indistinguishable by design)
+  remediation: Rotate or mint a new key; a disabled key reads as invalid and cannot be re-enabled.
+- code: use_case_forbidden
+  status: 403
+  meaning: Valid key, not enabled for this endpoint's use case
+  remediation: Re-authenticating will not fix a permissions problem; use an account-level key or mint one with the needed use case (lookup, parse, scrub, inbound_lookup, precall, mcp, sbc_redirect, report, manage).
+- code: rate_limited_key
+  status: 429
+  meaning: Per-key per-minute window exceeded
+  remediation: Honour Retry-After (seconds); default 60 requests/min per key.
+- code: rate_limited_pool
+  status: 429
+  meaning: Account-pooled budget exhausted (lookups, pre-call, daily reports)
+  remediation: Honour Retry-After; verify a business number to raise the pool or add prepaid credit for the standard tier.
+- code: rate_limited_ip
+  status: 429
+  meaning: Too many failed auth attempts from your IP
+  remediation: Back off; fix the credential.
+- code: signature_invalid
+  status: 401
+  meaning: Operator request signing required, missing, or failed
+  remediation: Sign with the key's HKDF secret from GET /api/v1/account/signing; HMAC-signed requests MUST use the long /api/v1/* path.
+- code: insufficient_balance
+  status: 402
+  meaning: Prepaid balance cannot cover the request — top up
+  remediation: Body adds balance_micros, topup_url, topup_min_cents; POST /api/v1/account/topup ($5 minimum).
+- code: account_suspended
+  status: 403
+  meaning: Account suspended by the operator; topping up will not help
+  remediation: Contact the provider.
+- code: paid_verification_required
+  status: 402
+  meaning: The remedy is a paid number verification, not a top-up
+  remediation: Free accounts may bind exactly one number; verify a business number.
+- code: receipt_invalid
+  status: 409
+  meaning: Missing, already-used, or mismatched receipt_id
+  remediation: Mint a fresh single-use receipt via POST /api/v1/inbound/lookup on the same number.
+problems:
+- status: 400
+  title: Bad Request
+  operations_declaring: 38
+  codes: []
+  source_operations:
+  - accountPhonePatch
+  - accountSignup
+  - accountTopup
+  - accountVerifyPhoneConfirm
+  - accountVerifyPhoneStart
+  - addTenantSuppression
+  - complianceEvidence
+  - createAccountKey
+  - createTenant
+  - getSigning
+  - getTenant
+  - inboundLookup
+  - …
+- status: 401
+  title: Unauthorized
+  operations_declaring: 39
+  codes:
+  - missing_key
+  - invalid_key
+  - signature_invalid
+  source_operations:
+  - accountPhonePatch
+  - accountPhonesList
+  - accountTopup
+  - accountVerifyPhoneConfirm
+  - accountVerifyPhoneStart
+  - addTenantSuppression
+  - cidLookup
+  - complianceEvidence
+  - createAccountKey
+  - createTenant
+  - getAccount
+  - getSigning
+  - …
+- status: 402
+  title: Payment Required
+  operations_declaring: 6
+  codes:
+  - insufficient_balance
+  - paid_verification_required
+  source_operations:
+  - accountVerifyPhoneConfirm
+  - cidLookup
+  - inboundLookup
+  - lookupNumber
+  - lookupNumberBatch
+  - v1Scrub
+- status: 403
+  title: Forbidden
+  operations_declaring: 20
+  codes:
+  - use_case_forbidden
+  - account_suspended
+  source_operations:
+  - accountPhonePatch
+  - accountPhonesList
+  - accountVerifyPhoneConfirm
+  - accountVerifyPhoneStart
+  - addTenantSuppression
+  - complianceEvidence
+  - createAccountKey
+  - createTenant
+  - getAccount
+  - getTenant
+  - issueTenantKey
+  - listAccountKeys
+  - …
+- status: 404
+  title: Not Found
+  operations_declaring: 23
+  codes: []
+  source_operations:
+  - accountPhonePatch
+  - accountTopup
+  - accountVerifyPhoneConfirm
+  - accountVerifyPhoneStart
+  - addTenantSuppression
+  - getAccount
+  - getAccountKey
+  - getAccountListing
+  - getAccountListingReports
+  - getReceipt
+  - getTenant
+  - issueTenantKey
+  - …
+- status: 409
+  title: Conflict
+  operations_declaring: 8
+  codes:
+  - receipt_invalid
+  source_operations:
+  - accountVerifyPhoneConfirm
+  - createAccountKey
+  - createTenant
+  - issueTenantKey
+  - reportNumber
+  - rotateAccountKey
+  - updateAccountKey
+  - verifyCheckout
+- status: 413
+  title: Payload Too Large
+  operations_declaring: 2
+  codes: []
+  source_operations:
+  - uploadListingDocument
+  - uploadListingLogo
+- status: 415
+  title: Unsupported Media Type
+  operations_declaring: 2
+  codes: []
+  source_operations:
+  - uploadListingDocument
+  - uploadListingLogo
+- status: 429
+  title: Too Many Requests
+  operations_declaring: 22
+  codes:
+  - rate_limited_key
+  - rate_limited_pool
+  - rate_limited_ip
+  source_operations:
+  - accountSignup
+  - accountVerifyPhoneStart
+  - cidLookup
+  - createAccountKey
+  - getReceipt
+  - inboundLookup
+  - listCountries
+  - lookupChanges
+  - lookupNumber
+  - lookupNumberBatch
+  - mcpRpc
+  - parsePhoneNumber
+  - …
+- status: 503
+  title: Service Unavailable
+  operations_declaring: 3
+  codes: []
+  source_operations:
+  - accountTopup
+  - healthCheck
+  - lookupChanges
+channel_specific_contracts:
+- surface: GET /api/v1/cid/{number} (cidLookup, cidLookupFallback)
+  contract: 'ALWAYS text/plain; every failure (auth, balance, rate limit, unresolvable) is the literal body UNAVAILABLE while the HTTP status stays meaningful (200 / 401 / 402 / 429). Observed: anonymous call → 401 text/plain "UNAVAILABLE".'
+- surface: POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool
+  contract: Always HTTP 200 with neutral/empty variables or a graceful result string on failure (a non-2xx would keep the caller ringing).
+- surface: POST /api/v1/sbc/redirect
+  contract: 'Fail-open: timeout or internal error returns decision=allow; a 603 block only ever follows a deterministic or authoritative fact.'
+- surface: POST /api/v1/mcp (tools/call)
+  contract: Domain misses come back as a result with isError:true and an LLM-readable message; protocol faults (unknown tool, missing argument) are JSON-RPC -32602; HTTP-level auth failures use the flat error shape.
+- surface: POST /api/v1/inbound/lookup
+  contract: Fail-open neutral body on internal errors; known and unknown numbers return the same 200 shape (anti-enumeration).
+- surface: GET /api/v1/lookup/{e164}
+  contract: Invalid input returns 200 with valid:false (not 400) and is not billed.
+retry_guidance: '429 → wait Retry-After seconds (also retry_after_seconds in the body). 402 → top up, then retry; billed lookups accept an Idempotency-Key so a retry is not double-billed. 401 invalid_key vs 403 use_case_forbidden are distinct: only the latter is a permissions problem.'

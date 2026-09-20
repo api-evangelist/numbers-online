@@ -1,0 +1,134 @@
+generated: '2026-09-19'
+method: derived
+source: Derived by aligning the LIVE MCP tools/list (mcp/numbers-online-mcp-tools-list.json, 4 tools, anonymous 200) and the A2A agent card skills (a2a/, same 4 ids) with the provider OpenAPI 3.0.3 (openapi/numbers-online-openapi.yml, 56 operations). Confidence per row; nothing mapped that does not exist in both.
+purpose: Bind each agent-facing tool to the REST operation(s) that back it so the tool inherits a real request contract, and record where the three surfaces diverge. The MCP inputSchemas here are the live, provider-served schemas — not guessed.
+surfaces:
+  rest_openapi: openapi/numbers-online-openapi.yml (56 operations; source https://numbers.online/api/spec)
+  mcp: https://numbers.online/api/v1/mcp (tools/list PUBLIC — schemas below are live; tools/call key-gated)
+  a2a: https://numbers.online/api/v1/a2a (skills = the 4 MCP tool names; endpoint key-gated; NOT described in the OpenAPI)
+  graphql: null
+crosswalk:
+- tool: phone_lookup
+  a2a_skill: phone_lookup
+  category: lookup
+  rest:
+  - lookupNumber
+  - inboundLookup
+  binding: rest
+  confidence: medium
+  note: The tool bundle = the GET /api/v1/lookup/{e164} fields (validity, formatting, line type, range carrier, country, CNAM, verstat, spam signal via ?verstat= and ?max_cache_age=) PLUS a first-party DNC signal and a signed receipt, which the plain lookup does not mint — receipts come from POST /api/v1/inbound/lookup. The tool is therefore a server-side composite of both; its inputSchema (number, verstat, max_cache_age_seconds) maps 1:1 onto lookupNumber's path + query parameters.
+- tool: line_type
+  a2a_skill: line_type
+  category: lookup
+  rest:
+  - v1Parse
+  - lookupNumber
+  binding: rest
+  confidence: medium
+  note: Deterministic subset only (validity, line type, carrier, country, formatting) with no paid dip — the same fields POST /api/v1/parse returns for free, and the deterministic half of lookupNumber. Input is number only.
+- tool: caller_risk
+  a2a_skill: caller_risk
+  category: risk
+  rest:
+  - inboundLookup
+  binding: rest
+  confidence: medium
+  note: Spam signal + verstat passthrough + DNC signal + receipt without a name dip — the inbound caller-intelligence shape (risk, receipt_id, signed) minus display_label. Input (number, verstat) maps onto inboundLookup's number + verstat body fields.
+- tool: dnc_check
+  a2a_skill: dnc_check
+  category: compliance
+  rest:
+  - precallLookup
+  - v1Scrub
+  binding: rest
+  confidence: high
+  note: Returns the same first-party SUPPRESS / NO_MATCH / UNKNOWN suppression-preference scrub that POST /api/v1/outbound/lookup (single destination) and POST /api/v1/scrub (list) return, plus a signed receipt. The llms.txt states this equivalence explicitly. Not the government/licensed DNC registry.
+mcp_only: []
+a2a_only:
+- surface: POST /api/v1/a2a
+  reason: The A2A JSON-RPC endpoint itself has no OpenAPI operation; the four skills it exposes are the MCP tools above.
+rest_only:
+- capability: Account & keys
+  operations:
+  - accountSignup
+  - getAccount
+  - updateAccount
+  - accountTopup
+  - listAccountKeys
+  - createAccountKey
+  - getAccountKey
+  - updateAccountKey
+  - rotateAccountKey
+  - accountPhonesList
+  - accountPhonePatch
+  - accountVerifyPhoneStart
+  - accountVerifyPhoneConfirm
+- capability: Listings (business profile)
+  operations:
+  - getAccountListing
+  - putAccountListing
+  - verifyCheckout
+  - uploadListingLogo
+  - uploadListingDocument
+  - getAccountListingReports
+- capability: Parsing & reference
+  operations:
+  - v1ParseBatch
+  - v1Countries
+  - parsePhoneNumber
+  - parsePhoneNumbersBulk
+  - listCountries
+- capability: Lookup (bulk / feed / PBX)
+  operations:
+  - lookupNumberBatch
+  - lookupChanges
+  - cidLookup
+  - cidLookupFallback
+- capability: Outbound enrollment
+  operations:
+  - precallEnroll
+  - precallLookupAlias
+  - precallEnrollAlias
+- capability: List scrubbing (legacy)
+  operations:
+  - scrubList
+- capability: Community reporting
+  operations:
+  - reportNumber
+- capability: SBC / SIP & operator signing
+  operations:
+  - sbcRedirect
+  - complianceEvidence
+  - getSigning
+  - setSigning
+- capability: Receipts & verification
+  operations:
+  - getReceipt
+  - publicKey
+- capability: MSP multi-tenant
+  operations:
+  - listTenants
+  - createTenant
+  - getTenant
+  - setTenantStatus
+  - issueTenantKey
+  - listTenantSuppressions
+  - addTenantSuppression
+  - removeTenantSuppression
+- capability: Voice-agent webhooks (not MCP)
+  operations:
+  - retellInbound
+  - vapiTool
+- capability: Transport / system
+  operations:
+  - mcpRpc
+  - healthCheck
+coverage:
+  tools_named: 4
+  tools_bound: 4
+  mcp_only: 0
+  a2a_skills: 4
+  rest_operations_total: 56
+  rest_operations_with_a_tool: 5
+  rest_operations_without_a_tool: 51
+  note: 'The agent surfaces are deliberately a narrow, read-only projection: lookup, classification, risk and DNC. Every write (accounts, keys, listings, enrollment, reports, tenants, suppressions) is REST-only.'

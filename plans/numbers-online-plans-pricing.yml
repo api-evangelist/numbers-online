@@ -1,0 +1,111 @@
+specification: API Commons Plans
+specificationVersion: '0.1'
+provider: Numbers Online
+providerId: numbers-online
+created: '2026-09-19'
+modified: '2026-09-19'
+generated: '2026-09-19'
+method: searched
+sources:
+- https://numbers.online/pricing
+- https://numbers.online/api/spec (info.description "Billing")
+- https://numbers.online/developers
+- https://numbers.online/terms §10
+description: 'Public lookups are free forever with no account. The API has a free, unbilled, rate-limited tier on a self-service key (no card, no sales call), a prepaid standard tier billed per dip against a balance topped up in $5–$500 Stripe Checkout increments, and a custom enterprise tier. Separately, number VERIFICATION is what raises pooled API limits: personal is a one-time $9 (a trust badge — adds no API capacity), business is $29/year auto-renewing per number (+60/min, +2,000/day lookups, +100/day reports each). Prices in USD, exclusive of taxes.'
+currency: USD
+plan_count: 5
+plans:
+- id: free
+  name: Free API tier (Public lookup)
+  type: free
+  price: 0
+  billing_period: null
+  description: Every endpoint works on the free tier, unbilled and rate-limited; no card.
+  included:
+    lookups: 10/min · 50/day pooled per account
+    reports: 10/day pooled
+    scrub: 1,000 numbers/min · 5,000/day floor
+    parse_reference: free on every tier
+  signup: POST /api/v1/account/signup or https://numbers.online/developers
+- id: personal-verified
+  name: Personal · Verified
+  type: one-time
+  price: 9
+  billing_period: one-time
+  description: Verify ownership of a personal number; the public sees only "verified & online" plus its risk score. A trust badge, not API capacity — same free API pool.
+  renews: false
+  refund: refundable only if verification fails (Terms §10)
+- id: business-verified
+  name: Business · Verified
+  type: subscription
+  price: 29
+  billing_period: year
+  per: verified business number
+  description: Business identity verification with a public profile; raises the account's pooled API limits and unlocks the accountable report lane and outbound pre-call enrollment.
+  raises_limits:
+    lookups_per_minute: '+60'
+    lookups_per_day: '+2000'
+    reports_per_day: '+100'
+  renews: true
+  cancellation: cancel anytime from the dashboard; takes effect at the end of the current billing year
+- id: standard-prepaid
+  name: Standard (prepaid)
+  type: usage-based
+  price: null
+  billing_period: usage
+  description: Prepaid credit ($5 minimum to $500 per Stripe Checkout) billed per dip against the balance; 402 insufficient_balance when exhausted.
+  entries:
+  - label: Number lookup with a fresh wholesale CNAM dip
+    operations:
+    - lookupNumber
+    - lookupNumberBatch
+    - cidLookup
+    price: 0.004
+    unit: per valid number
+  - label: Number lookup served from cache / without a CNAM supplier
+    operations:
+    - lookupNumber
+    - lookupNumberBatch
+    - cidLookup
+    price: 0.002
+    unit: per valid number
+  - label: Inbound caller intelligence (signed)
+    operations:
+    - inboundLookup
+    price: 0.004
+    unit: per dip
+  - label: List scrub
+    operations:
+    - v1Scrub
+    price: 0.001
+    unit: per number
+  - label: AI-voice-agent bundled call (MCP tools/call, Vapi/Retell webhooks)
+    operations:
+    - mcpRpc
+    - vapiTool
+    - retellInbound
+    price: 0.015
+    unit: per tool call
+    note: MCP line_type is free; dnc_check free until a licensed data partner is configured (per the guide)
+  - label: SBC / SIP redirect decision
+    operations:
+    - sbcRedirect
+    price: 0.01
+    unit: per decision
+  - label: Outbound pre-call check, parse, countries, reputation-change feed, invalid numbers
+    operations:
+    - precallLookup
+    - v1Parse
+    - v1ParseBatch
+    - v1Countries
+    - lookupChanges
+    price: 0
+    unit: free / bundled
+  observability: X-Billed-Micros / X-Balance-Micros / X-Billing-Endpoint response headers; GET /api/v1/account for balance and trailing-30-day usage
+- id: enterprise
+  name: Enterprise
+  type: custom
+  price: null
+  billing_period: null
+  description: Custom caller-intelligence lookups, custom report quota, custom billing — contact the provider.
+  contact: https://numbers.online/concierge

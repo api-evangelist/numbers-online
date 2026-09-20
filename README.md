@@ -64,5 +64,26 @@
 > Full detail: **[Where this data comes from](https://apievangelist.com/about/where-our-data-comes-from)**
 <!-- API-EVANGELIST-PROVENANCE:END -->
 
-Numbers Online is a company surfaced via the API Evangelist harvest backlog (source: a2a-registry) and added to the network as a stub for full-pipeline profiling.
-- https://numbers.online/
+Numbers Online is a phone-number trust and intelligence service operated by Evergrow Management Pte. Ltd. (Singapore). It runs a free public reverse phone lookup with a community-driven, advisory spam-risk score, paid number verification for people and businesses, and a B2B API keyed on a single E.164 primitive: parsing and validation, single and batch lookup (line type, range carrier, CNAM, STIR/SHAKEN verstat and a low-confidence spam signal), signed inbound caller intelligence with Ed25519 receipts, an outbound pre-call do-not-contact scrub with call-provenance enrollment, consent-first list scrubbing, a ClearIP-compatible SBC/SIP redirect decision, a multi-tenant MSP control plane, and a hosted read-only MCP server plus Vapi/Retell webhooks for AI voice agents.
+
+- Website: https://numbers.online/
+- Developers: https://numbers.online/developers · API reference: https://numbers.online/docs · Pricing: https://numbers.online/pricing
+- OpenAPI 3.0.3 (56 operations, provider-hosted source of truth): https://numbers.online/api/spec — harvested verbatim to `openapi/`
+- llms.txt: https://numbers.online/llms.txt · A2A agent card: https://numbers.online/.well-known/agent-card.json · MCP server: `POST https://numbers.online/api/v1/mcp`
+- GitHub: https://github.com/numbers-online
+
+## What this profile holds (enrichment pass 2026-09-19)
+
+| Artifact | Method | Notes |
+|---|---|---|
+| `openapi/` | searched | verbatim JSON original + YAML serialization |
+| `a2a/` | probed | agent card graded **conformant**; endpoint answers 405/401 as declared |
+| `mcp/` | probed | live `tools/list` (4 tools) + `initialize`; crosswalk to REST operationIds; official MCP registry listing |
+| `well-known/` | probed | closed path list on apex + www with a negative control; only the agent card is served |
+| `llms/` | searched | verbatim |
+| `authentication/`, `agentic-access/`, `security/` | derived / generated / probed | pipeline scripts |
+| `conventions/`, `errors/`, `lifecycle/`, `rate-limits/`, `plans/`, `changelog/`, `conformance/` | searched | from the spec description, docs, pricing and terms |
+| `regulatory/` | searched | DSR process and report notice-and-action recorded; everything else checked and absent |
+| `skills/`, `data-model/`, `overlays/`, `packages/` | generated / derived / searched | no SDKs exist on any registry — recorded honestly |
+
+Not found (recorded, not fabricated): no security.txt, no OAuth/OIDC discovery, no RFC 9728 metadata, no api-catalog, no apis.json, no status page, no outbound webhooks or AsyncAPI, no SDKs, no CLI, no sandbox/test values, no WSDL or protobuf.

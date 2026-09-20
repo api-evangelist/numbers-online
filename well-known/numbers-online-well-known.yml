@@ -1,0 +1,137 @@
+generated: '2026-09-19'
+method: probed
+source: Live GET probes of the closed /.well-known path list on numbers.online and www.numbers.online, 2026-09-19 (UTC evening). Every row is a request that was issued; every status is the one returned.
+summary:
+  hosts_probed: 2
+  paths_probed: 34
+  documents_served: 4
+  hit_count: 2
+  note: 'Numbers Online serves exactly ONE well-known document: an A2A Agent Card, at both the canonical /.well-known/agent-card.json and the legacy /.well-known/agent.json, on the apex and on www (www otherwise 301s to the apex; the www copy differs from the apex copy only by 16 bytes — www.numbers.online is substituted into the four URL fields url, documentationUrl, iconUrl and provider.url; the apex copy is canonical, see a2a/). The same JSON is also served at /api/agent-card, which robots.txt explicitly Allows alongside /api/spec under a blanket Disallow: /api/. No security.txt (neither /.well-known nor root), no OIDC/OAuth discovery, no RFC 9728 protected-resource metadata (also probed at /.well-known/oauth-protected-resource/api/v1/mcp and /api/v1/mcp/.well-known/oauth-protected-resource — 404), no RFC 9727 api-catalog, no apis.json, no ai-plugin.json, no ucp/acp/aauth documents.'
+  mcp_host_note: The MCP server is path-hosted at https://numbers.online/api/v1/mcp — the MCP host IS the apex, so the apex rows above are the MCP-host rows. mcp.numbers.online, api.numbers.online, docs.numbers.online, developer.numbers.online and status.numbers.online all 301 to https://numbers.online/ and serve nothing of their own.
+  auth_model_note: 'Consistent with the absent OAuth metadata: the API and MCP server use static API keys (Bearer or X-API-Key, keys prefixed nol_), so there is no authorization server to advertise. delegated_identity / dynamic_client_registration / protected_resource_metadata are genuinely absent, not mis-probed.'
+path_echo_control: passed
+negative_control:
+  path: /.well-known/numbers-online-negative-control-7c2e91af.json
+  status: 404
+  hosts:
+  - numbers.online
+  - www.numbers.online
+hosts:
+- host: numbers.online
+  role: Apex — website, docs, REST API host (OpenAPI servers[0]), MCP server host and A2A endpoint host
+  documents:
+  - path: /.well-known/security.txt
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/openid-configuration
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/oauth-authorization-server
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/oauth-protected-resource
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/api-catalog
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/api-catalog.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/ai-plugin.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/ucp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/acp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/aauth-resource.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/apis.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /apis.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /apis.yml
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/agent-card.json
+    status: 200
+    content_type: application/json
+    file: numbers-online-agent-card.json
+    standard: A2A Agent Card (protocolVersion 0.3.0)
+  - path: /.well-known/agent.json
+    status: 200
+    content_type: application/json
+    file: numbers-online-agent-card.json
+    standard: A2A Agent Card (protocolVersion 0.3.0)
+    note: Legacy pre-0.3 path; byte-identical to /.well-known/agent-card.json on this host.
+  - path: /.well-known/mcp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /security.txt
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+- host: www.numbers.online
+  role: Alias — 301s to the apex for /, but answers /.well-known/* directly
+  documents:
+  - path: /.well-known/security.txt
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/openid-configuration
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/oauth-authorization-server
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/oauth-protected-resource
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/api-catalog
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/api-catalog.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/ai-plugin.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/ucp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/acp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/aauth-resource.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/apis.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /apis.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /apis.yml
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /.well-known/agent-card.json
+    status: 200
+    content_type: application/json
+    file: numbers-online-agent-card.json
+    standard: A2A Agent Card (protocolVersion 0.3.0)
+  - path: /.well-known/agent.json
+    status: 200
+    content_type: application/json
+    file: numbers-online-agent-card.json
+    standard: A2A Agent Card (protocolVersion 0.3.0)
+    note: Legacy pre-0.3 path; byte-identical to /.well-known/agent-card.json on this host.
+  - path: /.well-known/mcp.json
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.
+  - path: /security.txt
+    status: 404
+    note: Next.js not-found page (text/html, ~14.4 KB) — a real 404, not a catch-all 200.

@@ -1,0 +1,100 @@
+generated: '2026-09-19'
+method: searched
+source: SEARCHED the provider docs (/docs, /developers, /trust, /privacy, /terms), the OpenAPI at https://numbers.online/api/spec (securitySchemes, error schema, header parameters, enums) and the well-known probe; DERIVED nothing the contract or docs do not state.
+standards:
+- id: api-key-auth
+  conforms: true
+  evidence: openapi/numbers-online-openapi.yml components.securitySchemes ApiKeyAuth (apiKey in header X-API-Key), BearerAuth (http bearer) and CidQueryKeyAuth (apiKey in query "key", header-less PBX/webhook endpoints only); applied per operation via security[] on 51 of 56 operations.
+- id: oauth2
+  conforms: false
+  evidence: No oauth2 securityScheme in the OpenAPI; /.well-known/oauth-authorization-server and /.well-known/oauth-protected-resource 404 on numbers.online and www (well-known/numbers-online-well-known.yml). Keys are static nol_-prefixed API keys.
+- id: oidc
+  conforms: false
+  evidence: /.well-known/openid-configuration 404 on both hosts; no openIdConnect securityScheme.
+- id: rfc9728-protected-resource-metadata
+  conforms: false
+  evidence: 404 at /.well-known/oauth-protected-resource, /.well-known/oauth-protected-resource/api/v1/mcp and /api/v1/mcp/.well-known/oauth-protected-resource. The MCP server authenticates with a static API key instead.
+- id: rfc9457-problem-details
+  conforms: false
+  evidence: 'openapi/numbers-online-openapi.yml components.schemas.Error — errors are a flat JSON object {error: prose, code: enum, retry_after_seconds?} served as application/json, not application/problem+json. See errors/numbers-online-problem-types.yml.'
+- id: rfc9116-security-txt
+  conforms: false
+  evidence: /.well-known/security.txt and /security.txt both 404 (probe 2026-09-19).
+- id: rfc9727-api-catalog
+  conforms: false
+  evidence: /.well-known/api-catalog and /.well-known/api-catalog.json 404.
+- id: apis-json
+  conforms: false
+  evidence: /apis.json, /.well-known/apis.json and /apis.yml 404.
+- id: llms-txt
+  conforms: true
+  evidence: https://numbers.online/llms.txt 200 text/plain, H1 + blockquote + sections in llms.txt format; robots.txt names it as the agent-discovery entry point. Saved verbatim at llms/numbers-online-llms.txt.
+- id: a2a-agent-card
+  conforms: true
+  evidence: https://numbers.online/.well-known/agent-card.json 200, protocolVersion 0.3.0, graded conformant against the 1.0.0 hard checks (a2a/numbers-online-a2a.yml).
+- id: mcp-streamable-http
+  conforms: true
+  evidence: POST https://numbers.online/api/v1/mcp answers initialize with protocolVersion 2025-06-18 and tools/list with four tools carrying inputSchema and readOnlyHint/idempotentHint annotations (mcp/numbers-online-mcp.yml).
+- id: json-rpc-2.0
+  conforms: true
+  evidence: MCP and A2A endpoints are JSON-RPC 2.0 over HTTP POST; GET returns 405 with "POST JSON-RPC to this endpoint."
+- id: rfc9309-robots
+  conforms: true
+  evidence: 'https://numbers.online/robots.txt applies RFC 9309 longest-match to carve /api/spec and /api/agent-card out of Disallow: /api/ and names the sitemap.'
+- id: idempotency-key
+  conforms: true
+  partial: true
+  evidence: 'openapi/numbers-online-openapi.yml declares an optional Idempotency-Key header parameter on lookupNumber, lookupNumberBatch, v1Scrub and sbcRedirect (4 operations) with at-most-once BILLING semantics on retries. Not a general replay-protection mechanism across the mutating surface — see conventions/numbers-online-conventions.yml idempotency.coverage: partial.'
+- id: pagination
+  conforms: true
+  partial: true
+  evidence: 'openapi/numbers-online-openapi.yml lookupChanges (GET /api/v1/lookup/changes) is a cursor feed: since + limit (max 1000) with a returned cursor; no other list operation paginates (batch endpoints are bounded at 100 / 1,000 items).'
+- id: rfc8594-sunset-deprecation-headers
+  conforms: false
+  evidence: Six operations carry deprecated:true but are described as frozen permanent aliases with no Sunset date; no Sunset/Deprecation response header is declared anywhere in the spec.
+- id: rate-limit-retry-after
+  conforms: true
+  evidence: openapi/numbers-online-openapi.yml components.responses.RateLimited declares the Retry-After header (seconds) on 429; the Error schema mirrors it as retry_after_seconds. No IETF RateLimit-* headers.
+- id: e164
+  conforms: true
+  domain_standard: true
+  evidence: 'openapi/numbers-online-openapi.yml: the whole contract is keyed on ITU-T E.164 — path parameter {e164} on GET /api/v1/lookup/{e164} and PATCH /api/v1/account/phones/{e164}, LookupResponse.e164 ("Canonical E.164 number"), ParsedPhoneNumber.e164/rfc3966, and every request body number field documented as E.164 ("+14155552671").'
+- id: stir-shaken-verstat
+  conforms: true
+  domain_standard: true
+  evidence: openapi/numbers-online-openapi.yml LookupResponse.verstat enum [verified, unverified, unknown] ("Normalized STIR/SHAKEN verstat"), the ?verstat= query parameter on lookupNumber, and the verstat/attestation body fields on inboundLookup and sbcRedirect accept TN-Validation-Passed / -Failed / No-TN-Validation or a full Identity / P-Asserted-Identity header value (ATIS-1000074 / RFC 8224 / RFC 8588 vocabulary) and fold it into the risk signal.
+- id: sip-redirect-decision (RFC 3261 response codes)
+  conforms: true
+  domain_standard: true
+  evidence: openapi/numbers-online-openapi.yml SbcRedirectResponse.sip.code enum [603, 302, 503, 404] and decision enum [allow, flag, redirect, block] — a "ClearIP-compatible" SIP redirect-server decision consumed by Kamailio/OpenSIPS/dSIPRouter shims (docs /integrations, guide sbc-sip-redirect).
+- id: 47-cfr-64.6305-robocall-mitigation-evidence
+  conforms: true
+  domain_standard: true
+  evidence: openapi/numbers-online-openapi.yml complianceEvidence (GET /api/v1/compliance/evidence) returns an EvidenceBundle (merkle_root, receipts[], response_signature) the operator may cite in its own Robocall Mitigation Database documentation; the provider states explicitly it is NOT an FCC certification.
+- id: ed25519-signed-responses (RFC 8032)
+  conforms: true
+  evidence: openapi/numbers-online-openapi.yml InboundLookupResponse / Receipt / EvidenceBundle carry response_signature "ed25519:<base64>" over signed_payload; GET /api/v1/publickey (keyless, observed 200) publishes the SPKI PEM verifying key.
+- id: operator-hmac-request-signing
+  conforms: true
+  evidence: 'openapi/numbers-online-openapi.yml getSigning/setSigning: HKDF-derived per-key secret, X-Operator-* headers, opt-in require_signed_requests on signed surfaces such as sbcRedirect.'
+- id: do-not-call-scrub
+  conforms: true
+  partial: true
+  evidence: openapi/numbers-online-openapi.yml v1Scrub / precallLookup return SUPPRESS / NO_MATCH / UNKNOWN from FIRST-PARTY owner-registered suppression preferences; the provider states this is NOT the US FTC National DNC Registry, the Singapore PDPC DNC Registry or any licensed registry, and that compliance.dnc_status stays "unknown" until a government/licensed provider is configured. The privacy policy says the company honours the Singapore national DNC Registry for its own marketing.
+- id: gdpr-pdpa-ccpa-privacy-statements
+  conforms: true
+  evidence: https://numbers.online/privacy names Singapore PDPA (home jurisdiction), EU/UK GDPR and CCPA/CPRA obligations, controller/processor roles, legal bases, SCCs for transfers and a 30-day DSR response aim. A published privacy-law posture, not a certification or audit.
+- id: fcra
+  conforms: false
+  evidence: 'Terms §6: "Numbers Online is NOT a consumer reporting agency as defined by the U.S. Fair Credit Reporting Act" and prohibits eligibility uses. Recorded as a stated NON-applicability, not a gap.'
+- id: soc2-iso27001-pci-certifications
+  conforms: false
+  evidence: 'probe-security-programs.py: vdp=none trust=none; /trust is a trust-and-safety page with no named certification; no trust center. No Compliance pointer emitted.'
+domain_standard_signature:
+  market: Telephony / caller identity / do-not-call compliance
+  declared_in_contract:
+  - E.164 as the identity primitive
+  - STIR/SHAKEN verstat enum + attestation passthrough
+  - SIP 603/302/503/404 redirect decision (ClearIP-compatible)
+  - 47 CFR 64.6305 evidence bundle
+  note: All four are declared in the OpenAPI schema/enums themselves, not only in prose.

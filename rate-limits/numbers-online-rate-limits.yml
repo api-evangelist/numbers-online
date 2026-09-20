@@ -1,0 +1,125 @@
+specification: API Commons Rate Limits
+specificationVersion: '0.1'
+provider: Numbers Online
+providerId: numbers-online
+created: '2026-09-19'
+modified: '2026-09-19'
+generated: '2026-09-19'
+method: searched
+sources:
+- https://numbers.online/pricing
+- https://numbers.online/docs
+- https://numbers.online/developers
+- https://numbers.online/api/spec
+description: 'Rate limits are account-pooled and business-scaled: the pooled budgets (lookups, inbound caller-intelligence, the outbound pre-call check, community reports) are shared across every key on an account and recomputed from live state, so minting extra keys never raises them; verifying a business number raises them per number, personal ($9) verification does not. All other endpoints use a per-key 60 requests/minute window. On exhaustion the API returns 429 with a Retry-After header (seconds), mirrored as retry_after_seconds in the flat JSON error body, with code rate_limited_key, rate_limited_pool or rate_limited_ip. No X-RateLimit-* or IETF RateLimit-* headers are documented. The provider states limits are indicative fair-use defaults, not a service-level guarantee.'
+headers:
+  retryAfter: Retry-After
+  bodyField: retry_after_seconds
+  rateLimitRemaining: null
+  rateLimitLimit: null
+  rateLimitReset: null
+responseCodes:
+  throttled: 429
+errorCodes:
+- rate_limited_key
+- rate_limited_pool
+- rate_limited_ip
+limit_count: 11
+limits:
+- name: Per-key default window (lookup, scrub, CID, MCP, SBC and every non-pooled endpoint)
+  scope: key
+  metric: requests_per_minute
+  limit: 60
+  timeFrame: minute
+  code: rate_limited_key
+- name: Free / unverified pooled lookups per minute
+  scope: account
+  tier: free
+  metric: lookups_per_minute
+  limit: 10
+  timeFrame: minute
+  code: rate_limited_pool
+- name: Free / unverified pooled lookups per day
+  scope: account
+  tier: free
+  metric: lookups_per_day
+  limit: 50
+  timeFrame: day
+  code: rate_limited_pool
+- name: Free / unverified pooled spam-risk reports per day
+  scope: account
+  tier: free
+  metric: reports_per_day
+  limit: 10
+  timeFrame: day
+  code: rate_limited_pool
+- name: Per verified business number — added lookups per minute
+  scope: account
+  tier: business-verified
+  metric: lookups_per_minute
+  limit: 60
+  timeFrame: minute
+  increment: true
+  note: +60/min per verified business number, pooled across the account
+- name: Per verified business number — added lookups per day
+  scope: account
+  tier: business-verified
+  metric: lookups_per_day
+  limit: 2000
+  timeFrame: day
+  increment: true
+- name: Per verified business number — added reports per day
+  scope: account
+  tier: business-verified
+  metric: reports_per_day
+  limit: 100
+  timeFrame: day
+  increment: true
+- name: Free-tier scrub allowance (counted in numbers, not requests)
+  scope: account
+  tier: free
+  metric: numbers_per_minute
+  limit: 1000
+  timeFrame: minute
+  note: 5,000/day floor; verified business numbers scale it; a 1,000-number batch costs 1,000 pool units
+- name: Free-tier scrub allowance per day
+  scope: account
+  tier: free
+  metric: numbers_per_day
+  limit: 5000
+  timeFrame: day
+- name: Self-service signup
+  scope: ip
+  metric: requests_per_hour
+  limit: 3
+  timeFrame: hour
+  operation: accountSignup
+- name: Failed authentication attempts
+  scope: ip
+  metric: failed_auth_attempts
+  limit: null
+  timeFrame: null
+  code: rate_limited_ip
+  note: threshold not published
+payload_caps:
+- operation: lookupNumberBatch / v1ParseBatch
+  cap: 100 numbers per request
+- operation: v1Scrub
+  cap: 1,000 numbers per request
+- operation: lookupChanges
+  cap: limit max 1000
+- operation: complianceEvidence
+  cap: window capped at 400 days
+- operation: accountTopup
+  cap: $5 minimum – $500 maximum per checkout
+other_throttles:
+- operation: accountVerifyPhoneStart
+  note: 429 with Retry-After on OTP cooldown/velocity
+- surface: site try-it widgets
+  note: keyless demo proxy, lightly throttled per network
+tiers:
+  free: unbilled, pooled floor above
+  standard: prepaid; burst past the pool pay-as-you-go per request (pooled, not metered, for the pooled budgets)
+  enterprise: custom — contact
+observed:
+  note: 'No live 429 was provoked; the anonymous probes returned 401 with no rate-limit headers (server: cloudflare, cf-ray present).'

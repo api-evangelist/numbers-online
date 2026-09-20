@@ -1,18 +1,158 @@
 aid: numbers-online
 name: Numbers Online
-description: 'Numbers Online is a company surfaced via the API Evangelist harvest backlog (source: a2a-registry)
-  and added to the network as a stub for full-pipeline profiling.'
+description: 'Numbers Online is a phone-number trust and intelligence service operated by Evergrow Management Pte.
+  Ltd. of Singapore. It runs a free public reverse phone lookup with a community-driven, advisory spam-risk score,
+  paid number verification for people and businesses, and a B2B API keyed on a single E.164 primitive: parsing and
+  validation, single and batch lookup (line type, range carrier, CNAM, STIR/SHAKEN verstat and a low-confidence
+  spam signal), signed inbound caller intelligence with Ed25519 receipts, an outbound pre-call do-not-contact scrub
+  and call-provenance enrollment, consent-first list scrubbing, a ClearIP-compatible SBC/SIP redirect decision,
+  a multi-tenant MSP control plane, and a hosted read-only MCP server plus Vapi/Retell webhooks for AI voice agents.
+  The 56-operation REST API is published as an OpenAPI 3.0.3 contract at /api/spec, with an llms.txt, an A2A agent
+  card at /.well-known/agent-card.json, markdown mirrors of the docs, and a self-service free tier with no card.'
+image: https://numbers.online/android-chrome-512x512.png
 url: https://raw.githubusercontent.com/api-evangelist/numbers-online/refs/heads/main/apis.yml
 x-type: company
 x-source: harvest:a2a-registry
-x-tier: stub
+x-tier: enriched
 x-tier-reason: harvest
 specificationVersion: '0.20'
 created: '2026-09-19'
 modified: '2026-09-19'
 tags:
+- Phone Intelligence
+- Caller ID
+- CNAM
+- Reverse Phone Lookup
+- Spam Detection
+- Do Not Call
+- Telephony
+- STIR/SHAKEN
+- MCP
+- agent-native
+- Compliance
 - Company
-apis: []
+apis:
+- aid: numbers-online:numbers-online-phone-intelligence-api
+  name: Numbers Online Phone Intelligence API
+  description: 'One REST API over a single E.164 primitive: parse and validate numbers, single and bulk lookup (line
+    type, range carrier, CNAM, STIR/SHAKEN verstat and a supplementary spam signal), signed inbound caller intelligence
+    with single-use receipts, outbound pre-call do-not-contact scrub and call-provenance enrollment, consent-first
+    list scrubbing, prepaid accounts and key lifecycle, a ClearIP-compatible SBC/SIP redirect decision, operator
+    HMAC signing, a signed FCC robocall-mitigation evidence bundle, and a multi-tenant MSP control plane. Keys are
+    self-service (POST /api/v1/account/signup), sent as X-API-Key or Authorization: Bearer; the free tier is rate-limited
+    and unbilled, the standard tier is prepaid per dip.'
+  image: https://numbers.online/android-chrome-512x512.png
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online
+  tags:
+  - Phone Intelligence
+  - Caller ID
+  - CNAM
+  - Do Not Call
+  - Telephony
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-openapi.yml
+  - type: OpenAPI
+    name: Provider-hosted OpenAPI 3.0.3 (source of truth)
+    url: https://numbers.online/api/spec
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: Overlay
+    url: overlays/numbers-online-openapi-overlay.yaml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: AgentSkill
+    url: skills/_index.yml
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-mcp-server
+  name: Numbers Online MCP Server
+  description: A hosted, stateless, read-only Model Context Protocol server (JSON-RPC 2.0 over Streamable HTTP,
+    protocol 2025-06-18) at POST https://numbers.online/api/v1/mcp for AI voice agents (Vapi, Retell, Pipecat, LiveKit).
+    initialize, ping and tools/list are public; tools/call requires an API key with the mcp use case. Live tools/list
+    returns phone_lookup, line_type, caller_risk and dnc_check, each annotated readOnlyHint/idempotentHint. Every
+    output is a supplementary, low-confidence signal; the calling agent keeps every routing and dialing decision.
+    Billed $0.015 per tool call on the standard tier.
+  image: https://numbers.online/android-chrome-512x512.png
+  humanURL: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - MCP
+  - agent-native
+  - Phone Intelligence
+  properties:
+  - type: MCPServer
+    url: mcp/numbers-online-mcp.yml
+  - type: MCPServer
+    url: https://numbers.online/api/v1/mcp
+  - type: Documentation
+    url: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+  - type: ToolCrosswalk
+    url: mcp/numbers-online-tool-crosswalk.yml
+  - type: GitHubRepository
+    url: https://github.com/numbers-online/numbers-online-mcp
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: AgentCard
+    url: a2a/numbers-online-a2a.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+- aid: numbers-online:numbers-online-a2a-agent
+  name: Numbers Online A2A Agent
+  description: An Agent-to-Agent (A2A protocolVersion 0.3.0, JSONRPC) endpoint at POST https://numbers.online/api/v1/a2a
+    exposing four read-only skills — phone_lookup, line_type, caller_risk and dnc_check — the same capabilities
+    as the MCP tools. Discovered via the provider-served agent card at /.well-known/agent-card.json (also /.well-known/agent.json
+    and /api/agent-card). Bearer API key with the mcp use case; anonymous message/send returns 401 missing_key and
+    GET returns 405. This endpoint is not described in the OpenAPI.
+  image: https://numbers.online/android-chrome-512x512.png
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/a2a
+  tags:
+  - A2A
+  - agent-native
+  - Phone Intelligence
+  properties:
+  - type: AgentCard
+    url: a2a/numbers-online-a2a.yml
+  - type: AgentCard
+    url: https://numbers.online/.well-known/agent-card.json
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: ToolCrosswalk
+    url: mcp/numbers-online-tool-crosswalk.yml
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
@@ -21,3 +161,105 @@ maintainers:
 common:
 - type: Website
   url: https://numbers.online/
+- type: DomainSecurity
+  url: security/numbers-online-domain-security.yml
+- type: AgenticAccess
+  url: agentic-access/numbers-online-agentic-access.yml
+- type: Authentication
+  url: authentication/numbers-online-authentication.yml
+- type: DeveloperPortal
+  url: https://numbers.online/developers
+- type: Documentation
+  url: https://numbers.online/docs
+- type: APIReference
+  url: https://numbers.online/docs
+- type: GettingStarted
+  url: https://numbers.online/developers
+- type: Pricing
+  url: https://numbers.online/pricing
+- type: SignUp
+  url: https://numbers.online/developers
+- type: Login
+  url: https://numbers.online/login
+- type: TermsOfService
+  url: https://numbers.online/terms
+- type: PrivacyPolicy
+  url: https://numbers.online/privacy
+- type: About
+  url: https://numbers.online/about
+- type: Trust
+  url: https://numbers.online/trust
+- type: GitHubOrganization
+  url: https://github.com/numbers-online
+- type: LLMsTxt
+  url: https://numbers.online/llms.txt
+- type: AgentCard
+  url: a2a/numbers-online-a2a.yml
+- type: AgentCard
+  url: https://numbers.online/.well-known/agent-card.json
+  name: Provider-served A2A agent card (protocolVersion 0.3.0)
+- type: WellKnown
+  url: well-known/numbers-online-well-known.yml
+- type: LLMsTxt
+  url: llms/numbers-online-llms.txt
+- type: Packages
+  url: packages/numbers-online-packages.yml
+- type: Overlay
+  url: overlays/numbers-online-openapi-overlay.yaml
+- type: Conformance
+  url: conformance/numbers-online-conformance.yml
+- type: ErrorCatalog
+  url: errors/numbers-online-problem-types.yml
+- type: Lifecycle
+  url: lifecycle/numbers-online-lifecycle.yml
+- type: Deprecation
+  url: lifecycle/numbers-online-lifecycle.yml
+  name: Frozen-permanent-alias deprecation posture, stated in the OpenAPI at /api/spec
+- type: Conventions
+  url: conventions/numbers-online-conventions.yml
+- type: Idempotency
+  url: conventions/numbers-online-conventions.yml
+  name: Idempotency-Key on lookup, batch lookup, scrub and SBC redirect (at-most-once billing; coverage partial)
+- type: RateLimits
+  url: rate-limits/numbers-online-rate-limits.yml
+- type: Plans
+  url: plans/numbers-online-plans-pricing.yml
+- type: ChangeLog
+  url: changelog/numbers-online-changelog.yml
+- type: ChangeLog
+  url: https://numbers.online/api/spec
+  name: Version changelog table inside the OpenAPI description
+- type: DataModel
+  url: data-model/numbers-online-data-model.yml
+- type: AgentSkill
+  url: skills/_index.yml
+- type: AgentSkill
+  url: skills/numbers-online-inbound-caller-intelligence.md
+  name: Assess an inbound caller and file a receipt-backed report
+- type: AgentSkill
+  url: skills/numbers-online-outbound-precall-scrub.md
+  name: Scrub a destination before dialing and enrol your caller ID
+- type: AgentSkill
+  url: skills/numbers-online-pbx-caller-id.md
+  name: Label inbound calls on a PBX or softphone
+- type: AgentSkill
+  url: skills/numbers-online-key-lifecycle.md
+  name: Sign up, fund and rotate API keys safely
+- type: AgentSkill
+  url: skills/numbers-online-msp-tenants.md
+  name: Run multi-tenant customers under one prepaid balance
+- type: DataSubjectRequest
+  url: https://numbers.online/opt-out
+- type: NoticeAndAction
+  url: https://numbers.online/opt-out
+- type: Guides
+  url: https://numbers.online/docs/integrations
+- type: AgentInstructions
+  url: https://numbers.online/ai-agents
+- type: Support
+  url: https://numbers.online/concierge
+x-enrichment:
+  date: '2026-09-19'
+  status: enriched
+  artifacts_added: 31
+  pass: local-v3

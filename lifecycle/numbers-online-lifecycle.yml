@@ -1,0 +1,96 @@
+generated: '2026-09-19'
+method: searched
+source: https://numbers.online/api/spec (info.description sections "Canonical URL form (decision 2026-06-11)", "Schema versioning", "Version changelog"; deprecated:true flags), https://numbers.online/docs, https://numbers.online/pricing, https://numbers.online/terms (§7 caching, §8 re-scrub, §13 AS IS), GET https://numbers.online/api/health, and host probes for a status page.
+versioning:
+  scheme: uri-path + per-shape date-stamped schema_version
+  current: v1 (info.version 1.0.0; GET /api/health reports version v1.0.0-307f43d)
+  mechanism: 'Canonical paths are the long /api/v1/* form. Every JSON shape carries a schema_version string unique to that shape (e.g. 2026-06-03 for the lookup response, 2026-06-23 for pre-call). Bump rule: additive changes never bump; removing, renaming or retyping a field bumps. Clients must treat schema_version as an open string, never a closed enum.'
+  version_classes:
+    negotiable: unsigned live responses (lookup, batch, precall, scrub, report, account…) — may advance; additive fields appear without a bump
+    stamped: Ed25519-signed artifacts (inbound lookup responses, receipts, evidence bundles) — fixed into the signed bytes at signing time and never renegotiated
+  exempt: MCP JSON-RPC frames and the Vapi/Retell vendor webhook shapes (the embedded tool result is versioned instead); /api/v1/cid is plain text and unversioned by design.
+  docs: https://numbers.online/api/spec
+  changelog: changelog/numbers-online-changelog.yml
+deprecation:
+  policy_url: https://numbers.online/api/spec
+  policy_verbatim: '"the long /api/v1/* paths in this spec are canonical. The bare /v1/* spelling is a tolerated rewrite alias for header-less PBX URL fields only." Each legacy path is described as a "Frozen permanent alias … kept for existing integrations" / "kept forever (it is baked into published guides and agent prompts already in the field)".'
+  sunset_header: false
+  deprecation_header: false
+  sunset_dates_published: false
+  posture: 'Aliases are frozen and permanent rather than scheduled for removal: six operations carry deprecated:true in the OpenAPI, all documented as permanent aliases of a canonical v1 operation. Legacy /api/parse, /api/parse/bulk and /api/countries keep a {success:} envelope the v1 paths dropped; /api/scrub already uses the v1 dialect minus schema_version. Frozen field names (spam_score, risk_score) are likewise kept forever alongside the newer risk{} object.'
+  note: This is a documented deprecation posture inside the machine-readable contract, not a standalone policy page.
+deprecated_operations:
+- operationId: precallLookupAlias
+  method: POST
+  path: /api/v1/precall/lookup
+  alias_of: precallLookup
+  source: openapi/numbers-online-openapi.yml#precallLookupAlias
+- operationId: precallEnrollAlias
+  method: POST
+  path: /api/v1/precall/enroll
+  alias_of: precallEnroll
+  source: openapi/numbers-online-openapi.yml#precallEnrollAlias
+- operationId: parsePhoneNumber
+  method: POST
+  path: /api/parse
+  alias_of: v1Parse
+  source: openapi/numbers-online-openapi.yml#parsePhoneNumber
+- operationId: parsePhoneNumbersBulk
+  method: POST
+  path: /api/parse/bulk
+  alias_of: v1ParseBatch
+  source: openapi/numbers-online-openapi.yml#parsePhoneNumbersBulk
+- operationId: listCountries
+  method: GET
+  path: /api/countries
+  alias_of: v1Countries
+  source: openapi/numbers-online-openapi.yml#listCountries
+- operationId: scrubList
+  method: POST
+  path: /api/scrub
+  alias_of: v1Scrub
+  source: openapi/numbers-online-openapi.yml#scrubList
+sla:
+  url: https://numbers.online/terms
+  uptime_target: null
+  notes: 'Terms §13: the Service is provided "AS IS" and "AS AVAILABLE" with no uptime warranty; liability capped at the greater of USD 100 or six months of fees (§14). Pricing page: "Rate limits are operational fair-use controls and may be adjusted; they are indicative of current defaults, not a service-level guarantee." Enterprise tier is "Custom / Contact us".'
+status_page: null
+status_page_probe:
+- url: https://status.numbers.online/
+  status: 301
+  redirect: https://numbers.online/
+- url: https://numbers.online/status
+  status: 404
+- note: No status page is published; the docs/home pages contain no status/uptime link. GET https://numbers.online/api/health is a keyless liveness endpoint (observed 200 {"status":"ok","db":"up","version":"v1.0.0-307f43d",...}).
+health_endpoint:
+  url: https://numbers.online/api/health
+  operationId: healthCheck
+  auth: none
+  observed:
+    status: 200
+    body:
+      status: ok
+      db: up
+      version: v1.0.0-307f43d
+      time: '2026-09-20T00:45:27.845Z'
+data_lifetimes_stated:
+- item: Cached API responses (client side)
+  window: up to 30 days from retrieval, or any shorter period stated for a specific endpoint or field
+  source: Terms §7 "API integrations and caching (B2B carve-out)"
+- item: Scrub results
+  window: one-time use; re-scrub at least every 31 days
+  source: Terms §8
+- item: Call-provenance edges
+  window: 7 days (ttl_seconds 604800)
+  source: precall-call-provenance guide §4
+- item: Rotated key grace
+  window: 'default and maximum 24 h; grace_seconds: 0 kills it immediately'
+  source: openapi/numbers-online-openapi.yml#rotateAccountKey
+- item: SBC-redirect receipts
+  window: retained ~400 days to cover an annual recertification cycle; evidence window capped at 400 days
+  source: fcc-evidence-bundle guide §2
+- item: Reputation-change feed default window
+  window: last hour when no since cursor is passed
+  source: openapi/numbers-online-openapi.yml#lookupChanges
+docs_page_dates:
+  note: 'The integration guides publish Published/Updated dates (e.g. ai-voice-agents-mcp: Published June 3, 2026 · Updated June 7, 2026; precall-call-provenance: June 5 → June 18, 2026; fcc-evidence-bundle: June 3 → June 15, 2026). Privacy policy last updated 30 May 2026; Terms 29 August 2026.'

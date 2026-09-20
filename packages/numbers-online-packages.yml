@@ -1,0 +1,78 @@
+generated: '2026-09-19'
+method: searched
+source: Registry metadata endpoints probed 2026-09-19 (registry.npmjs.org, pypi.org/pypi/<pkg>/json), GitHub org https://github.com/numbers-online (1 public repo), the provider docs (/developers, /docs, /integrations, /ai-agents) and llms.txt.
+summary: 'Numbers Online ships NO first-party client library on any package registry and its docs never mention an SDK: the published developer surface is the OpenAPI, an llms.txt, copy-paste AI-coding-agent prompts, and drop-in integration artifacts (PBX/SBC/voice-agent configs). The only first-party code is a GitHub repo holding zero-dependency Node and Python reference clients for the MCP server, plus a server.json. None of these is an SDK, so no SDKs pointer is emitted.'
+registries_probed:
+- registry: npm
+  queries:
+  - numbers-online
+  - '@numbers-online/sdk'
+  - numbersonline
+  - numbers-online-mcp
+  - '@numbers-online/mcp'
+  - search?text=numbers-online
+  result: 404 on every name; search returns unrelated packages
+- registry: pypi
+  queries:
+  - numbers-online
+  - numbersonline
+  - numbers_online
+  result: 404 on every name
+- registry: github
+  queries:
+  - orgs/numbers-online
+  - search/repositories?q="numbers.online"
+  result: 'org exists (created 2026-06-16, contact@numbers.online, blog https://numbers.online) with one repo: numbers-online/numbers-online-mcp (MIT, pushed 2026-06-16, no releases, no package manifest)'
+packages:
+- language: javascript
+  registry: github
+  kind: reference-client
+  name: numbers-online-mcp/examples/node/lookup.mjs
+  url: https://github.com/numbers-online/numbers-online-mcp/blob/main/examples/node/lookup.mjs
+  install: none — a single-file script run with node 18+ (NUMBERS_ONLINE_KEY=… node lookup.mjs +14155552671)
+  official: true
+  version: null
+  published: null
+  note: 'Not on a registry and not versioned: a zero-dependency fetch-based example that speaks the Streamable HTTP transport. Repo last pushed 2026-06-16; no releases or tags.'
+- language: python
+  registry: github
+  kind: reference-client
+  name: numbers-online-mcp/examples/python/lookup.py
+  url: https://github.com/numbers-online/numbers-online-mcp/blob/main/examples/python/lookup.py
+  install: none — a single-file stdlib-only script (python 3.8+)
+  official: true
+  version: null
+  published: null
+  note: Same as the Node example; stdlib only. Not a library.
+integration_artifacts:
+  note: First-party, copy-paste, server-side drop-ins — configuration for third-party PBX/SBC/voice-agent platforms, not client libraries. All fetched 200 on 2026-09-19.
+  items:
+  - platform: FreePBX CID Superfecta
+    file: source-NumbersOnline.module
+    url: https://numbers.online/integrations/freepbx/source-NumbersOnline.module
+    content_type: application/octet-stream
+  - platform: FreeSWITCH / FusionPBX mod_cidlookup
+    file: cidlookup.conf.xml
+    url: https://numbers.online/integrations/freeswitch/cidlookup.conf.xml
+    content_type: application/xml
+  - platform: 3CX server-side CRM
+    file: numbers-online.crm.xml
+    url: https://numbers.online/integrations/3cx/numbers-online.crm.xml
+    content_type: application/xml
+  - platform: Kamailio / dSIPRouter SIP redirect
+    file: numbers_online_sbc.cfg
+    url: https://numbers.online/integrations/kamailio/numbers_online_sbc.cfg
+    content_type: application/octet-stream
+  - platform: Vapi MCP tool
+    file: vapi-mcp-tool.json
+    url: https://numbers.online/integrations/mcp/vapi-mcp-tool.json
+    content_type: application/json
+  - platform: Vapi custom function tool
+    file: numbers-online-tool.json
+    url: https://numbers.online/integrations/vapi/numbers-online-tool.json
+    content_type: application/json
+  - platform: Retell call_inbound webhook
+    file: inbound-webhook.json
+    url: https://numbers.online/integrations/retell/inbound-webhook.json
+    content_type: application/json
+sdk_count: 0

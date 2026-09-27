@@ -1,0 +1,51 @@
+{
+  "provider": "numbers-online",
+  "sources": [
+    "_original/numbers-online-openapi.json",
+    "numbers-online-openapi.yml"
+  ],
+  "outputs": [
+    "numbers-online-account-api-openapi.yml",
+    "numbers-online-community-reporting-api-openapi.yml",
+    "numbers-online-inbound-api-openapi.yml",
+    "numbers-online-lookup-api-openapi.yml",
+    "numbers-online-mcp-api-openapi.yml",
+    "numbers-online-msp-api-openapi.yml",
+    "numbers-online-outbound-api-openapi.yml",
+    "numbers-online-pbx-api-openapi.yml",
+    "numbers-online-parsing-api-openapi.yml",
+    "numbers-online-receipts-api-openapi.yml",
+    "numbers-online-reference-api-openapi.yml",
+    "numbers-online-sbc-sip-api-openapi.yml",
+    "numbers-online-system-api-openapi.yml",
+    "numbers-online-trust-api-openapi.yml",
+    "numbers-online-webhooks-api-openapi.yml"
+  ],
+  "archived": [
+    "archived openapi/numbers-online-openapi.yml"
+  ],
+  "errors": [],
+  "warnings": [],
+  "notes": [
+    "sourced from openapi/_original/ (1 archived document(s)); previously refined output at the top level was skipped rather than re-split",
+    "numbers-online-openapi.json: upgraded openapi 3.0.3 -> OpenAPI 3.2.0",
+    "numbers-online-openapi.yml: upgraded openapi 3.0.3 -> OpenAPI 3.2.0",
+    "tag 'Account' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Community reporting' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Inbound' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Lookup' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'MCP' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'MSP' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Outbound' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'PBX' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Parsing' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Receipts' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Reference' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'SBC / SIP' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'System' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Trust' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "tag 'Webhooks' spans 2 source specs (numbers-online-openapi.json, numbers-online-openapi.yml): per-path servers applied",
+    "apis.yml register: written (+15 apis, 17 total)"
+  ],
+  "skipped": []
+}

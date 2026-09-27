@@ -1,0 +1,531 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Outbound API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Outbound across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Outbound
+  description: Outbound pre-call checks (scrub + call-provenance) and number enrollment for spoofing-defense
+paths:
+  /api/v1/outbound/lookup:
+    post:
+      tags:
+      - Outbound
+      summary: Outbound pre-call check (scrub + provenance)
+      description: 'An outbound integration''s pre-call check on a destination. Returns the M1 pre-call scrub on `to` (SUPPRESS | NO_MATCH | UNKNOWN) plus three more supplementary signals: a compliance signal; an outbound `dial_risk` read — a low-confidence estimate of the cost/abuse risk of DIALING `to` (premium / satellite / international / IRSF-cover structural prior, plus any dynamic fraud observations); and a `cost_estimate` — the indicative RETAIL cost to reach `to`, priced for BOTH channels (voice per minute, SMS per message) from aggregated provider list-price decks, with a per-provider breakdown. All are supplementary signals, NEVER a consent grant or a block verdict: NO_MATCH is not permission to call and a dial_risk level is not a block — you remain responsible for your own lawful basis and dialing decision. For an ENROLLED caller (a verified business number you enrolled via /api/v1/outbound/enroll), it also records a hashed, short-TTL (from -> to) call-provenance edge: a self-incriminating record of who you actually dialled, used at report time to hold your number accountable for calls it DID place and to shield it from reports about calls it did NOT place (spoofing). Both ends are hashed, server-only, and never surfaced. Non-enrolled callers still get the scrub; no edge is written. Requires an API key with the `precall` use case. Free (bundled); not metered. Supplementary signal only — no per-call verdict. This is the canonical spelling — the outbound mirror of /api/v1/inbound/lookup; the original /api/v1/precall/lookup stays a permanent alias served by the same handler.'
+      operationId: precallLookup
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - to
+              properties:
+                to:
+                  type: string
+                  description: The destination number being called.
+                  example: '+14155551212'
+                from:
+                  type: string
+                  description: Your own calling number. A provenance edge is recorded only when this is a number you have enrolled.
+                  example: '+442071838750'
+                context:
+                  type: string
+                  enum:
+                  - outbound_voice
+                  - outbound_sms
+                  description: 'The channel you are about to use. Drives which suppression list is scrubbed: outbound_sms scrubs SMS preferences, anything else scrubs voice. Echoed back as `dnc_channel`.'
+      responses:
+        '200':
+          description: Pre-call scrub (+ provenance edge when enrolled)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-23'
+                  to:
+                    type: string
+                  dnc:
+                    type: string
+                    enum:
+                    - SUPPRESS
+                    - NO_MATCH
+                    - UNKNOWN
+                  dnc_channel:
+                    type: string
+                    enum:
+                    - voice
+                    - sms
+                    description: Which suppression list the `dnc` answer was scrubbed against (derived from `context`).
+                  dnc_note:
+                    type: string
+                  compliance:
+                    type:
+                    - object
+                    - 'null'
+                    properties:
+                      dnc_status:
+                        type: string
+                      reassigned_status:
+                        type: string
+                  dial_risk:
+                    type:
+                    - object
+                    - 'null'
+                    description: 'Outbound dial-risk signal: the cost/abuse risk of DIALING `to` (structural prior plus any dynamic fraud observations). Supplementary signal, not a block verdict. Null if scoring failed (fail-open).'
+                    properties:
+                      risk:
+                        type: integer
+                        description: Risk score 0–100.
+                        example: 6
+                      level:
+                        type: string
+                        enum:
+                        - low
+                        - medium
+                        - high
+                        description: 'Banded risk: low (<40), medium (40–69), high (≥70).'
+                      model:
+                        type: string
+                        enum:
+                        - dial_structural
+                        description: 'Scoring model (§ Risk models): the outbound structural model — NOT the inbound reputation blend.'
+                      structural_type:
+                        type:
+                        - string
+                        - 'null'
+                        enum:
+                        - premium_prs
+                        - satellite
+                        - intl_network
+                        - intl_premium
+                        - freephone
+                        - unallocated_dialable
+                        - ordinary
+                        description: The structural class the destination resolved to (null if no range matched).
+                      reason_codes:
+                        type: array
+                        items:
+                          type: string
+                        description: Legible drivers, e.g. `structural:intl_premium` or `dynamic:<source_class>`.
+                        example:
+                        - structural:intl_premium
+                      note:
+                        type: string
+                  cost_estimate:
+                    type:
+                    - object
+                    - 'null'
+                    description: Indicative RETAIL cost to reach `to`, from aggregated provider price-list decks (longest-prefix match, filtered by the destination's parsed line type). Returns BOTH channels regardless of `context` — `voice` priced per minute, `sms` per message — each null when no deck covers that channel; the whole object is null when neither does (fail-open). All amounts are decimal USD strings. Supplementary signal, never wholesale interconnect cost and never a quote.
+                    properties:
+                      currency:
+                        type: string
+                        enum:
+                        - USD
+                      note:
+                        type: string
+                      voice:
+                        allOf:
+                        - $ref: '#/components/schemas/ChannelCost'
+                        description: Per-minute voice rate, or null if no voice deck covers the destination.
+                      sms:
+                        allOf:
+                        - $ref: '#/components/schemas/ChannelCost'
+                        description: Per-message SMS rate, or null if no SMS deck covers the destination.
+                  enrolled:
+                    type: boolean
+                  provenance_recorded:
+                    type: boolean
+                  provenance_note:
+                    type: string
+                  edge_id:
+                    type: string
+                  ttl_seconds:
+                    type: integer
+                    example: 604800
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/outbound/enroll:
+    post:
+      tags:
+      - Outbound
+      summary: Enroll a number for call-provenance
+      description: 'Owner-only control that enrolls (or, with `enrolled: false`, revokes) a verified business number you own for call-provenance. Enrollment is your attestation that this number only places calls after a Numbers Online outbound pre-call lookup, so the absence of a matching pre-call edge becomes a supplementary signal that a complaint may concern a spoofed call rather than one you placed. Only numbers bound to your own account can be enrolled; revocable and abuse-monitored. Requires an account-level API key with the `precall` use case (not a tenant sub-key). Supplementary signal only — not a compliance determination. This is the canonical spelling; the original /api/v1/precall/enroll stays a permanent alias served by the same handler. The same toggle is also available resource-shaped: GET /api/v1/account/phones lists your numbers, PATCH /api/v1/account/phones/{e164} flips enrollment.'
+      operationId: precallEnroll
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - number
+              properties:
+                number:
+                  type: string
+                  example: '+442071838750'
+                enrolled:
+                  type: boolean
+                  default: true
+                  description: Set false to revoke enrollment.
+      responses:
+        '200':
+          description: Enrollment updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-14'
+                  ok:
+                    type: boolean
+                  number:
+                    type: string
+                  enrolled:
+                    type: boolean
+                  attestation:
+                    type: string
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot manage enrollment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Number not bound to your account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/precall/lookup:
+    post:
+      tags:
+      - Outbound
+      summary: Outbound pre-call check — original spelling (permanent alias)
+      description: Permanent alias of POST /api/v1/outbound/lookup — the same handler under the original path, kept forever (it is baked into published guides and agent prompts already in the field). Request, response, auth, billing, and limits are identical; see the canonical entry. Prefer /api/v1/outbound/lookup in new integrations.
+      operationId: precallLookupAlias
+      deprecated: true
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - to
+              properties:
+                to:
+                  type: string
+                  example: '+14155551212'
+                from:
+                  type: string
+                  example: '+442071838750'
+                context:
+                  type: string
+                  enum:
+                  - outbound_voice
+                  - outbound_sms
+      responses:
+        '200':
+          description: Identical to POST /api/v1/outbound/lookup (same handler).
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/precall/enroll:
+    post:
+      tags:
+      - Outbound
+      summary: Enroll a number — original spelling (permanent alias)
+      description: Permanent alias of POST /api/v1/outbound/enroll — the same handler under the original path, kept forever. Request, response, auth, and limits are identical; see the canonical entry. Prefer /api/v1/outbound/enroll (or the resource form PATCH /api/v1/account/phones/{e164}) in new integrations.
+      operationId: precallEnrollAlias
+      deprecated: true
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - number
+              properties:
+                number:
+                  type: string
+                  example: '+442071838750'
+                enrolled:
+                  type: boolean
+                  default: true
+      responses:
+        '200':
+          description: Identical to POST /api/v1/outbound/enroll (same handler).
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot manage enrollment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Number not bound to your account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    LaneUsd:
+      type: object
+      description: A min/avg/max spread for one pricing lane, as decimal USD strings.
+      properties:
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
+    ProviderCost:
+      type: object
+      description: 'One named, publicly-displayable provider''s slice of the aggregate. Anonymous sources never appear here — they stay inside the channel-level numbers only. The lane fields present depend on the channel: a voice cost carries `international`/`local`, an SMS cost carries `person`/`application`; each is null when that provider''s decks do not split that way.'
+      properties:
+        name:
+          type: string
+          example: DIDWW
+        domain:
+          type:
+          - string
+          - 'null'
+          example: didww.com
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
+        international:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice: international lanes (default + origin-based).'
+        local:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice: in-country lanes.'
+        person:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS: person-originated (P2P) decks.'
+        application:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS: application-originated (A2P) decks.'
+    ChannelCost:
+      type: object
+      description: 'Indicative RETAIL cost to reach a destination on ONE channel, aggregated across provider price-list decks. All amounts are decimal USD strings (money is integer micro-USD internally). `unit` says whether the figures are per minute (voice) or per message (sms). The channel-relevant lane fields (voice: `international`/`local`; sms: `person`/`application`) appear at the aggregate level and per provider; `breakdown` lists only publicly-displayable providers (cheapest avg first), with anonymous sources folded into the aggregate numbers only.'
+      properties:
+        unit:
+          type: string
+          enum:
+          - per_minute
+          - per_message
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
+        network_type:
+          type:
+          - string
+          - 'null'
+          description: The line-type filter that was applied (e.g. `mobile`, `premium`), or null when unfiltered.
+          example: mobile
+        providers:
+          type: integer
+          description: Distinct providers behind the aggregate (named + anonymous).
+          example: 3
+        rate_count:
+          type: integer
+          description: Underlying rate entries aggregated.
+          example: 5
+        international:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice only: cross-provider international-lane aggregate.'
+        local:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice only: cross-provider in-country-lane aggregate.'
+        person:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS only: cross-provider P2P aggregate.'
+        application:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS only: cross-provider A2P aggregate.'
+        breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderCost'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

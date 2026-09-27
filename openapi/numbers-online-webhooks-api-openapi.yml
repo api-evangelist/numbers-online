@@ -1,0 +1,149 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Webhooks API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Webhooks across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Webhooks
+  description: AI-voice-agent webhook adapters (Retell inbound, Vapi custom tool) over the same lookup backend
+paths:
+  /api/v1/integrations/retell/inbound:
+    post:
+      tags:
+      - Webhooks
+      summary: Retell call_inbound webhook
+      description: 'Adapter for Retell''s call_inbound webhook. Looks up the inbound caller and returns dynamic_variables (caller_name, caller_line_type, caller_spam_score, caller_risk, caller_risk_model, caller_on_dnc, caller_reassigned, caller_signal) for the agent prompt, plus a receipt_id in metadata. ALWAYS returns HTTP 200 with a (possibly empty) variables block — a non-2xx would keep the caller ringing — so auth failure, a missing number, or a supplier timeout degrade to neutral variables (fail-open on the live-call path). Authenticate with a key via Authorization: Bearer or ?key= on the webhook URL.'
+      operationId: retellInbound
+      security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+      - CidQueryKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event:
+                  type: string
+                  example: call_inbound
+                call_inbound:
+                  type: object
+                  properties:
+                    from_number:
+                      type: string
+                      example: '+14155552671'
+                    to_number:
+                      type: string
+                      example: '+14155550100'
+      responses:
+        '200':
+          description: Retell dynamic variables (always 200, fail-open).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  call_inbound:
+                    type: object
+                    properties:
+                      dynamic_variables:
+                        type: object
+                        additionalProperties:
+                          type: string
+                      metadata:
+                        type: object
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/integrations/vapi/tool:
+    post:
+      tags:
+      - Webhooks
+      summary: Vapi custom (function) tool webhook
+      description: 'Adapter for a Vapi custom function tool (an alternative to pointing Vapi at /api/v1/mcp). Accepts Vapi''s {message:{type:"tool-calls", toolCallList:[{id, arguments:{number}}]}} and returns {results:[{toolCallId, result}]} where result is the JSON-stringified phone_lookup bundle. Each call meters the bundled mcp_call rate. Fail-open: a bad argument or supplier hiccup yields a graceful result string. Authenticate with a key via Authorization: Bearer or ?key=.'
+      operationId: vapiTool
+      security:
+      - BearerAuth: []
+      - ApiKeyAuth: []
+      - CidQueryKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                message:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                      example: tool-calls
+                    toolCallList:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          arguments:
+                            type: object
+                            properties:
+                              number:
+                                type: string
+                                example: '+14155552671'
+      responses:
+        '200':
+          description: Vapi tool results (one per toolCallId).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        toolCallId:
+                          type: string
+                        result:
+                          type: string
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

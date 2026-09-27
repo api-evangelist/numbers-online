@@ -1,0 +1,332 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Trust API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Trust across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Trust
+  description: Contact-suppression preference lookups
+paths:
+  /api/v1/scrub:
+    post:
+      tags:
+      - Trust
+      summary: Scrub a calling list
+      description: 'Call-center list cleaning (API-key gated, `scrub` use case). Submit up to 1,000 numbers and an optional channel; for each, receive SUPPRESS (verified owner has a suppression preference — remove it), NO_MATCH (no suppression preference on record), or UNKNOWN (not resolvable). A compliance aid, not a legal determination; NO_MATCH is not consent. Billing (standard tier): $0.001 per number, debited after delivery, idempotent per content-scoped `Idempotency-Key`. Free tier: not billed — draws from an account-pooled allowance counted in NUMBERS (1,000/min and 5,000/day on the free floor; verified business numbers scale it), so a 1,000-number batch costs 1,000 pool units. The legacy `/api/scrub` path is a frozen alias (same dialect; this path adds `schema_version`).'
+      operationId: v1Scrub
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        description: 'Optional client-supplied request id for at-most-once billing on retries (content-scoped: the same key with a different number list does not dedupe).'
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - numbers
+              properties:
+                numbers:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 1000
+                  example:
+                  - '+16285550177'
+                  - '+12135559988'
+                channel:
+                  type: string
+                  enum:
+                  - voice
+                  - sms
+                  - whatsapp
+                  default: voice
+                  description: Contact channel to check the suppression preference for.
+      responses:
+        '200':
+          description: Per-number suppression status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-20'
+                  count:
+                    type: integer
+                  channel:
+                    type: string
+                    enum:
+                    - voice
+                    - sms
+                    - whatsapp
+                  disclaimer:
+                    type: string
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      suppress:
+                        type: integer
+                        description: Numbers with a suppression preference on record
+                      no_match:
+                        type: integer
+                        description: Numbers with no suppression preference (includes opt-ins)
+                      unknown:
+                        type: integer
+                        description: Numbers that could not be resolved
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        input:
+                          type: string
+                        e164:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                          - SUPPRESS
+                          - NO_MATCH
+                          - UNKNOWN
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/scrub:
+    post:
+      tags:
+      - Trust
+      summary: Scrub a calling list (legacy alias)
+      deprecated: true
+      description: Frozen permanent alias of `POST /api/v1/scrub`, kept for existing integrations (this one already uses the bare-object dialect; the v1 path adds `schema_version` and is where new fields land). New integrations should use the v1 path. Call-center list cleaning (API-key gated). Submit up to 1,000 numbers and an optional channel; for each, receive SUPPRESS (verified owner has a suppression preference — remove it), NO_MATCH (no suppression preference on record), or UNKNOWN (not resolvable). A compliance aid, not a legal determination; NO_MATCH is not consent.
+      operationId: scrubList
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - numbers
+              properties:
+                numbers:
+                  type: array
+                  items:
+                    type: string
+                  maxItems: 1000
+                  example:
+                  - '+16285550177'
+                  - '+12135559988'
+                channel:
+                  type: string
+                  enum:
+                  - voice
+                  - sms
+                  - whatsapp
+                  default: voice
+                  description: Contact channel to check the suppression preference for.
+      responses:
+        '200':
+          description: Per-number suppression status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                  channel:
+                    type: string
+                    enum:
+                    - voice
+                    - sms
+                    - whatsapp
+                  disclaimer:
+                    type: string
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      suppress:
+                        type: integer
+                        description: Numbers with a suppression preference on record
+                      no_match:
+                        type: integer
+                        description: Numbers with no suppression preference (includes opt-ins)
+                      unknown:
+                        type: integer
+                        description: Numbers that could not be resolved
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        input:
+                          type: string
+                        e164:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                          - SUPPRESS
+                          - NO_MATCH
+                          - UNKNOWN
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  responses:
+    InsufficientBalance:
+      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InsufficientBalance'
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    InsufficientBalance:
+      type: object
+      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
+      properties:
+        error:
+          type: string
+          example: Insufficient prepaid balance for this request.
+        code:
+          type: string
+          enum:
+          - insufficient_balance
+          description: Stable machine-readable code (added 2026-06-12).
+        balance_micros:
+          type:
+          - integer
+          - 'null'
+          description: Remaining balance in microdollars (may be 0 or null).
+          example: 0
+        topup:
+          type: string
+          description: How to add credit (prose; prefer the structured siblings).
+          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
+        topup_url:
+          type: string
+          example: /api/v1/account/topup
+          description: Top-up endpoint path.
+        topup_min_cents:
+          type: integer
+          example: 500
+          description: Minimum top-up amount in cents.
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

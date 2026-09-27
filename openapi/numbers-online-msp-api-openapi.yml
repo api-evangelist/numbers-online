@@ -1,0 +1,748 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online MSP API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged MSP across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: MSP
+  description: 'Multi-tenant control plane: per-tenant sub-keys, usage rollups, and suppression lists for MSPs and PBX resellers'
+paths:
+  /api/v1/account/tenants:
+    get:
+      tags:
+      - MSP
+      summary: List tenants
+      description: List the calling account's tenants, each with a trailing-30-day usage rollup and its sub-key count. For MSPs and PBX resellers managing many downstream customers under one prepaid balance. Only ACCOUNT-LEVEL keys (keys not themselves scoped to a tenant) may manage tenants — a tenant sub-key cannot.
+      operationId: listTenants
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Tenants with usage rollups.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenants:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TenantSummary'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The calling key has no associated account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - MSP
+      summary: Create a tenant
+      description: Create a tenant (a downstream customer/site) under the calling account. Tenants exist so per-customer usage, billing rollups, rate limits, and suppression lists are attributed separately while all spend draws on the one account balance. Requires an account-level key.
+      operationId: createTenant
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - name
+              properties:
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                  description: Human-readable tenant name (e.g. the downstream customer or site).
+                  example: Dental office
+      responses:
+        '201':
+          description: Tenant created.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant:
+                    $ref: '#/components/schemas/Tenant'
+                  next:
+                    type: string
+                    description: Suggested next call.
+                    example: POST /api/v1/account/tenants/{id}/keys to issue this tenant a sub-key.
+        '400':
+          description: Invalid request (missing/empty name, or longer than 120 chars).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: A tenant with this name already exists on the account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/tenants/{id}:
+    get:
+      tags:
+      - MSP
+      summary: Get tenant detail
+      description: 'Return one tenant''s detail: trailing-30-day usage rollup, its sub-keys (display fields only — never raw keys or hashes), and its suppression-list count and labels. Requires an account-level key.'
+      operationId: getTenant
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Tenant detail with usage, keys, and suppression summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant:
+                    $ref: '#/components/schemas/Tenant'
+                  usage_30d:
+                    $ref: '#/components/schemas/TenantUsage'
+                  keys:
+                    type: array
+                    description: The tenant's sub-keys (display fields only).
+                    items:
+                      $ref: '#/components/schemas/TenantKey'
+                  suppressions:
+                    type: object
+                    properties:
+                      count:
+                        type: integer
+                      entries:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Suppression'
+                        description: Labels + timestamps only — suppressed numbers are stored as hashes and are not recoverable.
+        '400':
+          description: Invalid tenant id (not a UUID).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - MSP
+      summary: Set tenant status
+      description: Enable or disable a tenant. Disabling a tenant also disables all of its sub-keys, which then fail authentication; re-enabling restores them. Requires an account-level key.
+      operationId: setTenantStatus
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - status
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - active
+                  - disabled
+                  description: New tenant status.
+                  example: disabled
+      responses:
+        '200':
+          description: Tenant status updated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      name:
+                        type: string
+                      status:
+                        type: string
+                        enum:
+                        - active
+                        - disabled
+                  note:
+                    type: string
+                    description: What the status change did to the tenant's sub-keys.
+        '400':
+          description: Invalid tenant id or status (must be "active" or "disabled").
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/tenants/{id}/keys:
+    post:
+      tags:
+      - MSP
+      summary: Issue a tenant sub-key
+      description: Mint an API key scoped to one tenant. The sub-key inherits the issuing account's tier (an account that has topped up issues metered sub-keys; a free-tier account issues free sub-keys) and bills against the account's single prepaid balance. Sub-keys can perform lookups only — they are PBX credentials, not account credentials, and cannot manage tenants or top up. The raw key is returned EXACTLY ONCE and is never recoverable. Requires an account-level key; the tenant must be active.
+      operationId: issueTenantKey
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  maxLength: 120
+                  description: Optional key name; defaults to "<tenant name> key".
+                  example: Front desk PBX
+      responses:
+        '201':
+          description: Sub-key issued; raw key returned once.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  api_key:
+                    type: string
+                    description: The raw key — shown ONLY here, never again.
+                    example: nol_8f3c2a1b9d4e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+                  key_prefix:
+                    type: string
+                    description: Non-secret display prefix.
+                    example: nol_8f3c2a1b
+                  name:
+                    type: string
+                  tier:
+                    type: string
+                    enum:
+                    - free
+                    - standard
+                    - enterprise
+                  rate_limit:
+                    type: integer
+                    description: Requests per 60-second window.
+                  allowed_use_cases:
+                    type: array
+                    items:
+                      type: string
+                    example:
+                    - lookup
+                  note:
+                    type: string
+                    description: Key-handling guidance.
+        '400':
+          description: Invalid tenant id (not a UUID).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Tenant is disabled — re-enable it before issuing keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/tenants/{id}/suppressions:
+    get:
+      tags:
+      - MSP
+      summary: List tenant suppressions
+      description: 'List a tenant''s suppression entries: labels + timestamps and a count. Numbers are stored only as SHA-256 hashes (platform privacy rule) and are never returned — keep your own list and use `label` as your reference. A suppressed number gets no enrichment (no CNAM dip, no spam score) and no charge when looked up through this tenant''s sub-keys. Requires an account-level key.'
+      operationId: listTenantSuppressions
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      responses:
+        '200':
+          description: Suppression labels and count (never the numbers).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  count:
+                    type: integer
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Suppression'
+                  note:
+                    type: string
+                    example: Suppressed numbers are stored as SHA-256 hashes; only your labels are listed.
+        '400':
+          description: Invalid tenant id (not a UUID).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - MSP
+      summary: Add a suppression
+      description: Add a number to the tenant's suppression list. The number is canonicalized through libphonenumber before its hash is stored, so it matches what the lookup path checks. A suppressed number returns no enrichment and is not billed for this tenant. Requires an account-level key.
+      operationId: addTenantSuppression
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - number
+              properties:
+                number:
+                  type: string
+                  description: Number to suppress (E.164 recommended).
+                  example: '+14155552671'
+                label:
+                  type: string
+                  maxLength: 120
+                  description: Optional reference label (the only field returned when listing — the number itself is hashed).
+                  example: front desk
+      responses:
+        '201':
+          description: Suppression added.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  suppressed:
+                    type: boolean
+                    example: true
+                  label:
+                    type:
+                    - string
+                    - 'null'
+        '400':
+          description: Invalid tenant id, or "number" is not a valid E.164 number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - MSP
+      summary: Remove a suppression
+      description: Remove a number from the tenant's suppression list. Submit the same number; it is canonicalized the same way before its hash is matched. Requires an account-level key.
+      operationId: removeTenantSuppression
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        description: Tenant id (UUID).
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - number
+              properties:
+                number:
+                  type: string
+                  description: Number to un-suppress (E.164 recommended).
+                  example: '+14155552671'
+      responses:
+        '200':
+          description: Suppression removed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id:
+                    type: string
+                    format: uuid
+                  suppressed:
+                    type: boolean
+                    example: false
+        '400':
+          description: Invalid tenant id, or "number" is not a valid E.164 number.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: The calling key is a tenant sub-key and may not manage tenants.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Tenant not found on this account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  schemas:
+    Suppression:
+      type: object
+      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
+      properties:
+        label:
+          type:
+          - string
+          - 'null'
+          description: Your reference label for the entry.
+          example: front desk
+        created_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    Tenant:
+      type: object
+      description: A tenant (downstream customer/site) under an MSP account.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dental office
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+          example: active
+        created_at:
+          type: string
+          format: date-time
+    TenantUsage:
+      type: object
+      description: A tenant's aggregated usage over the trailing 30 days.
+      properties:
+        requests:
+          type: integer
+          description: Total billed units in the window.
+          example: 420
+        billed_micros:
+          type: integer
+          description: Total billed amount over the window, in microdollars.
+          example: 1680000
+        fresh_cnam_dips:
+          type: integer
+          description: Lookups that performed a fresh wholesale CNAM dip ($0.004 each).
+        cached_or_enriched:
+          type: integer
+          description: Lookups served without a fresh dip ($0.002 each).
+    TenantKey:
+      type: object
+      description: A tenant sub-key (display fields only — never the raw key or its hash).
+      properties:
+        id:
+          type: string
+          format: uuid
+        key_prefix:
+          type: string
+          example: nol_8f3c2a1b
+        name:
+          type: string
+        tier:
+          type: string
+          enum:
+          - free
+          - standard
+          - enterprise
+        rate_limit:
+          type: integer
+          description: Requests per 60-second window.
+        requests_total:
+          type: integer
+          description: Lifetime request count for this sub-key.
+        disabled:
+          type: boolean
+    TenantSummary:
+      type: object
+      description: A tenant plus its sub-key count and trailing-30-day usage (list view).
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dental office
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+          example: active
+        created_at:
+          type: string
+          format: date-time
+        keys:
+          type: integer
+          description: Number of sub-keys issued to this tenant.
+          example: 2
+        usage_30d:
+          $ref: '#/components/schemas/TenantUsage'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

@@ -1,0 +1,593 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online SBC / SIP API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged SBC / SIP across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: SBC / SIP
+  description: SIP redirect-server decisions for session border controllers (Kamailio, OpenSIPS, dSIPRouter, Sansay, Oracle/Acme Packet, ProSBC) via the operator-run shim recipe, plus an FCC robocall-mitigation evidence bundle — a supplementary call-setup signal, fail-open
+paths:
+  /api/v1/sbc/redirect:
+    post:
+      tags:
+      - SBC / SIP
+      summary: SBC / SIP redirect decision
+      description: 'Call-setup decision for a SIP redirect server / SBC (Kamailio, OpenSIPS, dSIPRouter, Sansay, Oracle/Acme Packet, ProSBC), consumed by the operator-run shim recipe under /integrations. Given the calling number, returns a ClearIP-compatible decision the shim maps to a SIP final response: decision=block → 603 Decline; decision=redirect → 302 (the operator supplies the Contact); decision=allow|flag → the operator allow code (503 default, or 404 route-advance). `sip.code` is the exact recommended code. Requires a key with the `sbc_redirect` use case (every lookup-entitled key has it, backfilled). Billed per decision on the standard tier ($0.010); free tier is rate-limited. A 603 BLOCK is only ever a deterministic/authoritative fact (invalid number, or DNC listed / reassigned from a configured partner) — the low-confidence spam signal can only raise a flag/redirect. FAIL-OPEN on the call path: a timeout or error returns decision=allow rather than an error. AUTH fails closed (incl. opt-in operator HMAC signing via X-Operator-* headers; see GET /api/v1/account/signing). Every value is a supplementary signal — the SBC keeps every routing decision.'
+      operationId: sbcRedirect
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      - CidQueryKeyAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        description: Optional client-supplied request id for at-most-once billing on retries.
+        schema:
+          type: string
+      - name: X-SBC-Budget-Ms
+        in: header
+        required: false
+        description: The shim’s own call-setup deadline (ms). We never bill a decision that overran it. Capped at 5000.
+        schema:
+          type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - number
+              properties:
+                number:
+                  type: string
+                  description: The calling number (E.164 recommended).
+                  example: '+14155552671'
+                called_number:
+                  type: string
+                  description: The dialed/destination number (optional, reserved).
+                  example: '+14155550100'
+                verstat:
+                  type: string
+                  description: STIR/SHAKEN verstat passthrough; same accepted forms as /api/v1/lookup.
+                  example: TN-Validation-Passed
+                allow_code:
+                  type: integer
+                  enum:
+                  - 503
+                  - 404
+                  default: 503
+                  description: 'SIP code for allow/route-advance: 503 (ClearIP default) or 404 (Oracle/Acme, Ribbon, Metaswitch).'
+                spam_threshold:
+                  type: integer
+                  minimum: 1
+                  maximum: 99
+                  default: 80
+                  description: spam_score at/above which the decision becomes `flag` (advisory).
+                redirect_threshold:
+                  type: integer
+                  minimum: 1
+                  maximum: 99
+                  description: 'Opt-in: spam_score at/above which the decision becomes `redirect` (302 auto-divert). Omit to disable.'
+                block_reassigned:
+                  type: boolean
+                  default: false
+                  description: Treat reassigned `yes` (from a configured partner) as a block.
+                block_invalid:
+                  type: boolean
+                  default: true
+                  description: Block an unparseable/invalid calling number (deterministic).
+                budget_ms:
+                  type: integer
+                  description: Alternative to the X-SBC-Budget-Ms header.
+      responses:
+        '200':
+          description: Supplementary redirect decision (uniform shape for known/unknown/valid/invalid numbers).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SbcRedirectResponse'
+        '400':
+          description: Missing/empty number or malformed JSON.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required (or a required request signature was missing/invalid).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/compliance/evidence:
+    get:
+      tags:
+      - SBC / SIP
+      summary: FCC robocall-mitigation evidence bundle
+      description: A signed, PII-free, independently-verifiable RECORD of the supplementary number-status checks this account performed over a window — aggregated from signed lookup receipts. An operator can attach it to / reference it in their OWN robocall-mitigation program documentation (47 CFR 64.6305, "analytics systems used" / "reasonable steps"). It is NOT an FCC certification, NOT a compliance determination, and does NOT make anyone "compliant" — the operator signs their own attestation. Numbers appear only as hashes. Account-level keys only; auth fails closed. Verify each receipt’s signature, the bundle signature, and the Merkle root against GET /api/v1/publickey.
+      operationId: complianceEvidence
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: from
+        in: query
+        required: false
+        description: 'Window start (ISO 8601). Default: 365 days ago.'
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        required: false
+        description: 'Window end (ISO 8601). Default: now. Window capped at 400 days.'
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: The signed evidence bundle.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvidenceBundle'
+        '400':
+          description: Invalid window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot export evidence; use an account-level key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/signing:
+    get:
+      tags:
+      - SBC / SIP
+      summary: Operator HMAC signing secret (for the calling key)
+      description: 'Operator-grade HMAC request signing (Phase 4.3) for the calling key. Returns the key’s HKDF-derived signing secret (exposed only to the holder of the key — equivalent exposure to the key itself), the canonical scheme, and whether signing is currently required. The secret is never stored; it is re-derived on demand. signing_secret is null when the deployment has no signing master configured. Also reachable at the resource-homed alias /api/v1/account/keys/self/signing. Deliberately NOT gated on the manage use case: a narrowed, signing-locked key must always reach its own signing config.'
+      operationId: getSigning
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Signing state + secret for the calling key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningInfo'
+        '400':
+          description: Not available for dev-fallback keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - SBC / SIP
+      summary: Enable/disable HMAC signing on the calling key
+      description: Toggle require_signed_requests on the calling key. When enabled, signed surfaces (e.g. /api/v1/sbc/redirect) require a valid X-Operator-Signature on this key. This management route is never itself signature-gated, so a key can always disable signing or re-fetch its secret.
+      operationId: setSigning
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - enabled
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated signing state + secret.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SigningInfo'
+        '400':
+          description: Missing `enabled`, or a dev-fallback key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  schemas:
+    RiskView:
+      type: object
+      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
+      properties:
+        score:
+          type:
+          - integer
+          - 'null'
+          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
+        level:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - unknown
+          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
+        model:
+          type:
+          - string
+          - 'null'
+          enum:
+          - first_party_plus_restricted_sources
+          - first_party_plus_external
+          - dial_structural
+          - null
+          description: Which scoring pipeline produced the score; null when score is null.
+    SbcRedirectResponse:
+      type: object
+      description: Supplementary SBC/SIP redirect decision (plan 4.2). Same shape for known/unknown/valid/invalid numbers (anti-enumeration). Every field is a low-confidence supplementary signal — the SBC keeps the routing decision; Numbers Online never asserts a call is lawful, unlawful, safe, or spam.
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-06'
+        e164:
+          type:
+          - string
+          - 'null'
+          example: '+14155552671'
+        valid:
+          type: boolean
+        decision:
+          type: string
+          enum:
+          - allow
+          - flag
+          - redirect
+          - block
+          description: Recommended action (supplementary). flag = advisory elevated risk (still an allow code).
+        reason:
+          type: string
+          example: no_actionable_signal
+          description: Machine-readable reason code for the decision (e.g. invalid_number, dnc_listed, risk_over_flag_threshold, latency_budget, error).
+        sip:
+          type: object
+          description: The SIP final response the operator’s shim should emit.
+          properties:
+            code:
+              type: integer
+              enum:
+              - 603
+              - 302
+              - 503
+              - 404
+              example: 503
+              description: 603 block · 302 redirect · 503/404 allow-route-advance.
+            reason:
+              type: string
+              example: Service Unavailable
+        redirect_target:
+          type:
+          - string
+          - 'null'
+          description: Always null — the operator supplies the 302 Contact (screening/diversion target) in their own shim config.
+        advisory:
+          type: object
+          properties:
+            spam_score:
+              type:
+              - integer
+              - 'null'
+              minimum: 1
+              maximum: 99
+              description: Low-confidence supplementary spam signal; null when unavailable. Never drives a block. FROZEN field name — `risk` is the disclosed read.
+            risk:
+              $ref: '#/components/schemas/RiskView'
+            confidence:
+              type: string
+              enum:
+              - low
+            line_type:
+              type:
+              - string
+              - 'null'
+              example: mobile
+            verstat:
+              type: string
+              example: unknown
+            dnc_status:
+              type: string
+              enum:
+              - not_listed
+              - listed
+              - unknown
+            reassigned_status:
+              type: string
+              enum:
+              - 'no'
+              - 'yes'
+              - unknown
+        signal:
+          type: string
+          enum:
+          - supplementary
+        provider:
+          type: string
+          example: numbers.online
+        receipt_id:
+          type:
+          - string
+          - 'null'
+          example: nol_rec_8sd91kfh20aJ
+        insufficient_balance:
+          type: boolean
+          description: When true, the call is still ALLOWED on deterministic fields only (no fresh CNAM dip). Top up to restore full signal.
+        as_of:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    SigningInfo:
+      type: object
+      description: Operator HMAC request-signing state + secret for the calling key (Phase 4.3).
+      properties:
+        signing_required:
+          type: boolean
+        scheme:
+          type: string
+          example: hmac-sha256
+        max_skew_seconds:
+          type: integer
+          example: 300
+        canonical:
+          type: string
+          example: METHOD\nPATH\nsha256(body)hex\nX-Operator-Timestamp\nX-Operator-Nonce
+        headers:
+          type: array
+          items:
+            type: string
+        docs_url:
+          type: string
+        signing_secret:
+          type:
+          - string
+          - 'null'
+          description: The HKDF-derived HMAC secret for this key; null when signing is not configured on the deployment.
+    EvidenceBundle:
+      type: object
+      description: A signed FCC robocall-mitigation evidence bundle (plan 4.5). PII-free (numbers only as hashes). A record of supplementary checks — NOT an FCC certification or compliance determination.
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-06'
+        bundle_id:
+          type: string
+          example: nol_bundle_…
+        operator:
+          type: object
+          properties:
+            account_id:
+              type:
+              - string
+              - 'null'
+            key_prefix:
+              type:
+              - string
+              - 'null'
+        window:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+        generated_at:
+          type: string
+          format: date-time
+        totals:
+          type: object
+          description: 'Aggregate counts: checks, distinct_numbers, by_dnc, by_reassigned, by_context.'
+        merkle_root:
+          type:
+          - string
+          - 'null'
+          description: SHA-256 Merkle root over the receipt leaves; null when the window held no receipts.
+        receipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Receipt'
+        disclaimer:
+          type: string
+        response_signature:
+          type: string
+          description: '''ed25519:<base64>'' over the canonical bundle, or ''unsigned''.'
+        truncated:
+          type: boolean
+          description: True when the window held more than the per-bundle receipt cap (disclosed, never silent).
+        public_key_url:
+          type: string
+          example: https://numbers.online/api/v1/publickey
+        verify:
+          type: string
+    Receipt:
+      type: object
+      description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
+      properties:
+        receipt_id:
+          type: string
+          example: nol_rec_8sd91kfh20aJ
+        schema_version:
+          type:
+          - string
+          - 'null'
+          example: '2026-06-03'
+        number_hash:
+          type: string
+          description: SHA-256 hex of the E.164 — the only number representation stored.
+        line_type:
+          type:
+          - string
+          - 'null'
+          example: mobile
+        dnc_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - not_listed
+          - listed
+          - unknown
+          description: Supplementary do-not-call signal; "unknown" until a data partner is configured.
+        reassigned_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - 'no'
+          - 'yes'
+          - unknown
+        context:
+          type:
+          - string
+          - 'null'
+          example: mcp:dnc_check
+        checked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: The "as of T" the receipt cryptographically binds.
+        created_at:
+          type: string
+          format: date-time
+        signed_payload:
+          type:
+          - string
+          - 'null'
+          description: The exact canonical JSON that was signed (commits to number_hash).
+        response_signature:
+          type:
+          - string
+          - 'null'
+          description: '''ed25519:<base64>'', or ''unsigned''.'
+        verification:
+          type: object
+          properties:
+            algorithm:
+              type: string
+              example: ed25519
+            public_key_url:
+              type: string
+              example: https://numbers.online/api/v1/publickey
+            instructions:
+              type: string
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

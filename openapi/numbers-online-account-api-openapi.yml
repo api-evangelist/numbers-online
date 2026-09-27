@@ -1,0 +1,1520 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Account API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Account across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Account
+  description: 'Self-service API account: signup, balance, usage, credit top-ups, and the key lifecycle. Account-management endpoints require an account-level key with the ''manage'' use case (every self-service key holds it unless deliberately narrowed; the per-key signing config is exempt).'
+paths:
+  /api/v1/account/signup:
+    post:
+      tags:
+      - Account
+      summary: Sign up for an API key
+      description: Self-service account creation. NO AUTH REQUIRED — the API key plus the returned account UUID is your identity, not an email. The raw key (format `nol_…`) is returned exactly once and is never recoverable, and there is no recovery path, so store it securely. Each call mints a fresh account. Email is OPTIONAL (used only to send subscription renewal reminders) — never required, never deduplicated. New accounts start on the free tier with a zero credit balance; add credit via /api/v1/account/topup to use billed (standard-tier) endpoints.
+      operationId: accountSignup
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  description: Optional account/team label (never a personal name).
+                  example: Acme Telephony
+                email:
+                  type: string
+                  format: email
+                  description: Optional contact email, used only for subscription renewal reminders. Not required and not unique.
+                  example: ops@acme.example
+      responses:
+        '201':
+          description: Account created; key returned once.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-17'
+                  account:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                      email:
+                        type:
+                        - string
+                        - 'null'
+                        format: email
+                      balance_micros:
+                        type: integer
+                        example: 0
+                  api_key:
+                    type: string
+                    description: The raw key — shown ONLY here, never again.
+                    example: nol_8f3c2a1b9d4e6f7a8b9c0d1e2f3a4b5c6d7e8f9a
+                  key_prefix:
+                    type: string
+                    description: Non-secret display prefix you can store/show.
+                    example: nol_8f3c2a1b
+                  key:
+                    type: object
+                    description: Machine-readable key descriptor (§4.6). The pooled limits are the unverified FLOOR — budgets are recomputed per-request from live account state, and each verified business number raises them (+60/min, +2,000/day lookups, +100/day reports). The flagship lookup endpoints are governed by the POOLED budget shared across your keys, not the per-key window.
+                    properties:
+                      tier:
+                        type: string
+                        enum:
+                        - free
+                        - standard
+                        - enterprise
+                        example: free
+                      use_cases:
+                        type: array
+                        items:
+                          type: string
+                      limits:
+                        type: object
+                        properties:
+                          per_key_per_min:
+                            type: integer
+                            example: 60
+                          pooled_lookups_per_min:
+                            type: integer
+                            example: 10
+                          pooled_lookups_per_day:
+                            type: integer
+                            example: 50
+                          pooled_reports_per_day:
+                            type: integer
+                            example: 10
+                      limits_note:
+                        type: string
+                  note:
+                    type: string
+                    description: Key-handling and tier guidance.
+                  docs_url:
+                    type: string
+                    example: https://numbers.online/docs
+        '400':
+          description: A supplied email is malformed (email is optional; omit it to skip).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          description: Signup velocity limit (3/hour per IP). Retry-After header is set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account:
+    get:
+      tags:
+      - Account
+      summary: Get account balance and usage
+      description: 'Returns the authenticated key''s account: prepaid balance and recent usage (request count and billed amount over the trailing window). Use this to monitor spend and decide when to top up.'
+      operationId: getAccount
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Account balance, trailing-30-day usage, and key list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-15'
+                    description: Account-group envelope version (shared by GET and the PATCH ok-body).
+                  account:
+                    $ref: '#/components/schemas/Account'
+                  usage_30d:
+                    $ref: '#/components/schemas/UsageSummary'
+                  keys:
+                    type: array
+                    description: Keys belonging to this account (display fields only — never the raw key or its hash).
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        key_prefix:
+                          type: string
+                          example: nol_8f3c2a1b
+                        name:
+                          type: string
+                        tier:
+                          type: string
+                          enum:
+                          - free
+                          - standard
+                          - enterprise
+                        rate_limit:
+                          type: integer
+                          description: Requests per 60-second window.
+                        requests_total:
+                          type: integer
+                        last_used_at:
+                          type:
+                          - string
+                          - 'null'
+                          format: date-time
+                        disabled:
+                          type: boolean
+                  tenants:
+                    type: array
+                    description: 'MSP control plane (Phase 2.5): this account''s tenants. Detail and per-tenant usage live at GET /api/v1/account/tenants.'
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                        name:
+                          type: string
+                          example: Dental office
+                        status:
+                          type: string
+                          enum:
+                          - active
+                          - disabled
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot read the owning account (use an account-level key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The calling key has no associated account (legacy/internal key)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - Account
+      summary: Update account name / reminder email
+      description: Update account-level profile fields (name and/or the optional renewal-reminder email) from your own admin. Account-level keys only. Email is optional and not unique; send an empty string to clear it.
+      operationId: updateAccount
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Acme Voice
+                email:
+                  type: string
+                  format: email
+                  description: Optional renewal-reminder email; empty string clears it.
+                  example: ops@acme.example
+      responses:
+        '200':
+          description: Updated account
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-15'
+                  ok:
+                    type: boolean
+                  account:
+                    $ref: '#/components/schemas/Account'
+        '400':
+          description: Nothing to update or invalid email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/listings/{e164}:
+    parameters:
+    - name: e164
+      in: path
+      required: true
+      schema:
+        type: string
+      description: An E.164 number OTP-bound to this account (with or without the leading +).
+    get:
+      tags:
+      - Account
+      summary: Onboarding state + live trust for an account-owned number
+      description: 'API-first onboarding: read the onboarding state of one of your bound numbers — its draft profile, verification badge (trust_grade, set at verification), and the LIVE community risk score (risk.score, which can rise as the number is reported). Poll this after a verification payment to see state flip to "verified".'
+      operationId: getAccountListing
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: State, trust badge, live risk, listing, and any staged draft
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  e164:
+                    type: string
+                  state:
+                    type: string
+                    enum:
+                    - unverified
+                    - draft
+                    - verified
+                  trust_grade:
+                    type:
+                    - string
+                    - 'null'
+                    description: Static verification badge (A / A-), set at verification.
+                  risk:
+                    type:
+                    - object
+                    - 'null'
+                    properties:
+                      score:
+                        type: integer
+                        description: Live community risk 0–100 (higher = more risk). A supplementary signal.
+                      report_count:
+                        type: integer
+                      reports_last_30d:
+                        type: integer
+                      last_reported_at:
+                        type:
+                        - string
+                        - 'null'
+                        format: date-time
+                      review_total:
+                        type:
+                        - integer
+                        - 'null'
+                      review_positive:
+                        type:
+                        - integer
+                        - 'null'
+                  listing:
+                    type:
+                    - object
+                    - 'null'
+                    description: Present once verified.
+                  draft:
+                    type:
+                    - object
+                    - 'null'
+                    description: Staged-but-unpaid profile.
+        '404':
+          description: Number is not OTP-bound to this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+      - Account
+      summary: Stage a draft profile (or edit a live listing)
+      description: Stage/merge a business or personal profile for a bound number before verification (partial — only the keys you send are updated). Once the number is verified, the same call edits the live listing. Tax id / EIN (business) is stored privately and never published. Use POST .../logo to attach a logo.
+      operationId: putAccountListing
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind:
+                  type: string
+                  enum:
+                  - business
+                  - personal
+                  description: Sets the verification kind for a new draft (default business).
+                dba:
+                  type: string
+                  description: Display name (business).
+                legal_name:
+                  type: string
+                ein:
+                  type: string
+                  description: Tax id — stored privately, never published.
+                jurisdiction:
+                  type: string
+                formation_date:
+                  type: string
+                  example: '2019-04-01'
+                industry:
+                  type: string
+                address:
+                  type: string
+                website:
+                  type: string
+                bio:
+                  type: string
+                name:
+                  type: string
+                  description: Display name (personal).
+                role:
+                  type: string
+                marketing_opt_in:
+                  type: boolean
+      responses:
+        '200':
+          description: Draft staged or live listing edited
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  state:
+                    type: string
+                    enum:
+                    - draft
+                    - verified
+                  verification_id:
+                    type: string
+                    format: uuid
+        '400':
+          description: No editable fields provided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Listing was claimed on the website (edit it there)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Number is not OTP-bound to this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/listings/{e164}/verify-checkout:
+    parameters:
+    - name: e164
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Account
+      summary: Mint a verification payment link
+      description: Create a Stripe Checkout for personal ($9 one-time) or business ($29/yr) verification of a bound number — the kind comes from the staged draft. Open the returned url in a browser tab; once paid, the listing is PUBLISHED server-side (no return trip needed) and GET .../listings/{e164} flips to "verified". A profile must be staged first via PUT.
+      operationId: verifyCheckout
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Checkout URL (Stripe) or instant verified (dev provider)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  url:
+                    type:
+                    - string
+                    - 'null'
+                  state:
+                    type: string
+                  verification_id:
+                    type: string
+                    format: uuid
+                  handle:
+                    type:
+                    - string
+                    - 'null'
+        '400':
+          description: No draft profile staged yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Number already has a verified listing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/listings/{e164}/logo:
+    parameters:
+    - name: e164
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Account
+      summary: Upload a business logo
+      description: Upload a logo for a bound business number. Send the RAW image bytes as the request body with a Content-Type of image/png, image/jpeg, or image/webp (max 512 KB; SVG not accepted). The returned logo_url is stamped onto the draft (so it publishes with the listing) and onto a live listing if one exists.
+      operationId: uploadListingLogo
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Stored; returns the public logo_url
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  media_id:
+                    type: string
+                    format: uuid
+                  logo_url:
+                    type: string
+                  byte_size:
+                    type: integer
+                  content_type:
+                    type: string
+        '413':
+          description: Image too large (max 512 KB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported image type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/listings/{e164}/documents:
+    parameters:
+    - name: e164
+      in: path
+      required: true
+      schema:
+        type: string
+    post:
+      tags:
+      - Account
+      summary: Upload a verification document
+      description: Upload a supporting document an operator requested during verification of a bound number (the request-docs flow). Send the RAW file bytes as the request body with a Content-Type of application/pdf, image/png, image/jpeg, or image/webp (max 5 MB; SVG not accepted). When the number has an open draft verification, the stored document is attached to it so the operator's review can see what was received; with no open draft the document is stored but attached to nothing — upload while your verification is still in the draft/review state.
+      operationId: uploadListingDocument
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/webp:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Stored; returns the document reference
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  media_id:
+                    type: string
+                    format: uuid
+                  document_url:
+                    type: string
+                  byte_size:
+                    type: integer
+                  content_type:
+                    type: string
+        '400':
+          description: Empty body — send the raw document bytes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Number is not OTP-bound to this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '413':
+          description: Document too large (max 5 MB)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '415':
+          description: Unsupported document type
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/listings/{e164}/reports:
+    parameters:
+    - name: e164
+      in: path
+      required: true
+      schema:
+        type: string
+    - name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        default: 50
+        maximum: 200
+    get:
+      tags:
+      - Account
+      summary: Reports + reviews filed against an owned number
+      description: 'List the community reports and reviews on one of your bound numbers — the detail behind the risk score. Anonymous reporters are redacted (reporter: null).'
+      operationId: getAccountListingReports
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Reports + reviews (newest first)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  e164:
+                    type: string
+                  summary:
+                    type: object
+                  reports:
+                    type: array
+                    items:
+                      type: object
+                  reviews:
+                    type: array
+                    items:
+                      type: object
+        '404':
+          description: Number is not OTP-bound to this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/topup:
+    post:
+      tags:
+      - Account
+      summary: Add prepaid credit
+      description: 'Create a Stripe Checkout session to add prepaid credit to the authenticated account. Credit is applied to the balance when Stripe confirms payment (via /api/pay/webhook), idempotently keyed on the session id. Amount is in US cents: minimum $5 (500), maximum $500 (50000) per checkout. Requires Stripe to be configured server-side.'
+      operationId: accountTopup
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - amount_cents
+              properties:
+                amount_cents:
+                  type: integer
+                  minimum: 500
+                  maximum: 50000
+                  description: Credit to add, in US cents ($5–$500).
+                  example: 2000
+                promote_keys:
+                  type: boolean
+                  default: true
+                  description: By default a completed top-up switches any free-tier keys on the account to the metered standard tier. Pass false to opt out — but note an opted-out key stays priced $0 and is never debited, so the paid balance is unspendable until a later top-up promotes the keys.
+      responses:
+        '200':
+          description: Checkout session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                    description: Stripe Checkout URL to redirect the buyer to.
+                  session_id:
+                    type: string
+                    description: Stripe Checkout session id.
+                  promote_keys:
+                    type: boolean
+                    description: Echo of the promotion behavior this checkout will apply.
+                  note:
+                    type: string
+        '400':
+          description: Invalid amount (below $5 or above $500)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The calling key has no associated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Stripe is not configured server-side
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/keys:
+    get:
+      tags:
+      - Account
+      summary: List API keys
+      description: Display-only inventory of every key on the account (account-level keys and tenant sub-keys) — prefixes, tiers, use cases, limits, and rotation-grace state. Raw keys and hashes are never returned. Requires an account-level key with the 'manage' use case.
+      operationId: listAccountKeys
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Key inventory
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-16'
+                  keys:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ApiKeyView'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Key lacks the 'manage' use case, or is a tenant sub-key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - Account
+      summary: Mint a new API key
+      description: Create a new key on the account. The key inherits the caller's tier (tier is never body-controlled), and `use_cases` must be a subset of the caller's own — a minted key can never out-privilege its minter; omit it to clone the caller's list. Capped at 25 enabled keys per account plus a minting rate limit. The raw key is returned exactly once. Requires the 'manage' use case.
+      operationId: createAccountKey
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Dialer integration
+                use_cases:
+                  type: array
+                  items:
+                    type: string
+                  description: Subset of your own key's use cases. Omit to clone the caller's list.
+                  example:
+                  - lookup
+                  - scrub
+      responses:
+        '201':
+          description: Key created — the raw key is shown only here
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-16'
+                  api_key:
+                    type: string
+                    example: nol_…
+                  key:
+                    $ref: '#/components/schemas/ApiKeyView'
+                  note:
+                    type: string
+        '400':
+          description: use_cases not a subset of the caller's own
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Key lacks the 'manage' use case, or is a tenant sub-key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Enabled-key ceiling reached (25/account)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/keys/{id}:
+    parameters:
+    - name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    get:
+      tags:
+      - Account
+      summary: Read one API key
+      description: Display-only view of one key. A foreign or unknown id returns the same 404 as a malformed one (anti-enumeration).
+      operationId: getAccountKey
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-16'
+                  key:
+                    $ref: '#/components/schemas/ApiKeyView'
+        '404':
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - Account
+      summary: Rename or disable an API key
+      description: 'Update a key''s `name`, or revoke it with `disabled: true`. Disabling is ONE-WAY (a disabled key reads as invalid — rotate or mint instead of re-enabling), and disabling the LAST enabled account-level key is refused with 409: the key + account UUID is the identity (no recovery flow), so that would permanently brick the account and strand its balance.'
+      operationId: updateAccountKey
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                disabled:
+                  type: boolean
+                  description: Only `true` is accepted (one-way revocation).
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-16'
+                  ok:
+                    type: boolean
+                  key:
+                    $ref: '#/components/schemas/ApiKeyView'
+        '400':
+          description: Nothing to update, or disabled:false (re-enabling unsupported)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 'Refused: last enabled account-level key'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/keys/{id}/rotate:
+    post:
+      tags:
+      - Account
+      summary: Rotate an API key in place
+      description: 'Replace the key material on the SAME key record — the id, billing identity, rate buckets, and the HKDF-derived operator signing secret are unchanged, so signed-request SBC integrations keep verifying. The previous key keeps working for a grace window (default and maximum 24 h; pass `grace_seconds: 0` to kill it immediately, e.g. after a leak). The new raw key is returned exactly once.'
+      operationId: rotateAccountKey
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grace_seconds:
+                  type: integer
+                  minimum: 0
+                  maximum: 86400
+                  default: 86400
+                  description: How long the previous key keeps validating.
+      responses:
+        '200':
+          description: Rotated — the new raw key is shown only here
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-16'
+                  ok:
+                    type: boolean
+                  api_key:
+                    type: string
+                    example: nol_…
+                  key:
+                    $ref: '#/components/schemas/ApiKeyView'
+                  old_key_expires_at:
+                    type:
+                    - string
+                    - 'null'
+                    format: date-time
+                    description: When the previous key dies; null when grace_seconds was 0.
+                  note:
+                    type: string
+        '404':
+          description: Key not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Cannot rotate a disabled key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/phones:
+    get:
+      tags:
+      - Account
+      summary: List your verified numbers (enrollment inventory)
+      description: 'The verified business numbers bound to the calling account — the inventory the verify-phone OTP bind writes into — each with its call-provenance enrollment state. Account-level API keys only (tenant sub-keys 403). There is deliberately no POST and no DELETE here: numbers enter exclusively via the OTP bind (POST /api/v1/account/verify-phone/start — the Sybil floor) and leave via the reassignment lifecycle.'
+      operationId: accountPhonesList
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      responses:
+        '200':
+          description: Your bound numbers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-22'
+                  phones:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AccountPhone'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot read the account inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/phones/{e164}:
+    patch:
+      tags:
+      - Account
+      summary: Enroll / revoke call-provenance (resource form)
+      description: 'Resource-shaped equivalent of POST /api/v1/outbound/enroll: set `precall_enrolled` to true to enroll the number for call-provenance, false to revoke. STRICT update — the number must already be a verified number bound to your own account (404 otherwise); rows are never created or deleted here (creation is exclusively the OTP bind). Requires an account-level API key with the `precall` use case (not a tenant sub-key). Supplementary signal only — not a compliance determination.'
+      operationId: accountPhonePatch
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: e164
+        in: path
+        required: true
+        description: The bound number — '+14155552671', its URL-encoded form, or a bare digit slug '14155552671'.
+        schema:
+          type: string
+        example: '+442071838750'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - precall_enrolled
+              properties:
+                precall_enrolled:
+                  type: boolean
+                  description: true enrolls the number for call-provenance; false revokes.
+      responses:
+        '200':
+          description: Enrollment updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  schema_version:
+                    type: string
+                    example: '2026-06-22'
+                  phone:
+                    $ref: '#/components/schemas/AccountPhone'
+                  attestation:
+                    type: string
+                    description: The enrollment attestation; present only when enrolling.
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Tenant sub-keys cannot manage enrollment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Number not bound to your account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/verify-phone/start:
+    post:
+      tags:
+      - Account
+      summary: 'Verify a business number (step 1: send code)'
+      description: Step 1 of binding a business number to your account. Sends a one-time code by voice (default) or sms to a number your account controls, so an integration can prove control server-to-server. Account-level keys only (a tenant sub-key returns 403; an ownerless key 404). Binding an OTP-verified business number is what raises pooled limits (+60/min, +2,000/day lookups, +100/day reports), unlocks the accountable report lane, and enables pre-call enrollment.
+      operationId: accountVerifyPhoneStart
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - phone
+              properties:
+                phone:
+                  type: string
+                  description: The business number to verify, E.164.
+                  example: '+14155550142'
+                channel:
+                  type: string
+                  enum:
+                  - voice
+                  - sms
+                  default: voice
+                  description: Delivery channel for the one-time code (voice is the cheaper default).
+      responses:
+        '200':
+          description: Code sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  dev_code:
+                    type: string
+                    description: The code, echoed only in the dev OTP provider; never present in production.
+        '400':
+          description: Invalid phone, or the OTP request was rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: A tenant sub-key cannot manage account numbers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The calling key has no associated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/account/verify-phone/confirm:
+    post:
+      tags:
+      - Account
+      summary: 'Verify a business number (step 2: confirm code)'
+      description: 'Step 2: submit the code to verify and bind the number to your account (api_account_phones). A bound business number raises pooled limits, unlocks the accountable report lane, and enables pre-call enrollment. Free accounts may bind exactly one number; a number already claimed by another account is rejected (the Sybil floor). Account-level keys only.'
+      operationId: accountVerifyPhoneConfirm
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - phone
+              - code
+              properties:
+                phone:
+                  type: string
+                  description: The same number passed to /start, E.164.
+                  example: '+14155550142'
+                code:
+                  type: string
+                  description: The one-time code that was delivered.
+                  example: '123456'
+      responses:
+        '200':
+          description: Number verified and bound
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  verified_phone:
+                    type: string
+                  account_id:
+                    type: string
+                    format: uuid
+                  already_bound:
+                    type: boolean
+                    description: True when the number was already bound to this account (idempotent re-confirm).
+        '400':
+          description: Bad, expired, or exhausted code, or invalid phone
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          description: Free accounts can bind one phone number. Verify a number (personal $9 or business $29/yr) to bind additional numbers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: A tenant sub-key cannot manage account numbers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: The calling key has no associated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: This number is already claimed by another account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  schemas:
+    AccountPhone:
+      type: object
+      description: One verified number bound to the calling account, with its call-provenance enrollment state. These are the only fields the resource exposes — the platform's internal review/monitoring columns are operator-only by design.
+      properties:
+        e164:
+          type: string
+          example: '+442071838750'
+        verified_at:
+          type: string
+          format: date-time
+          description: When the OTP bind verified this number onto the account.
+        precall_enrolled:
+          type: boolean
+        precall_enrolled_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    Account:
+      type: object
+      description: 'A self-service API account. Balances are in microdollars (1e-6 USD): $0.004 = 4,000, a $5 top-up = 5,000,000.'
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type:
+          - string
+          - 'null'
+          format: email
+          description: Optional renewal-reminder email (may be null).
+        name:
+          type:
+          - string
+          - 'null'
+        balance_micros:
+          type: integer
+          description: Remaining prepaid credit in microdollars.
+          example: 5000000
+        balance_usd:
+          type: string
+          description: Same balance as a 2-decimal USD string.
+          example: '5.00'
+        status:
+          type: string
+          enum:
+          - active
+          - suspended
+          example: active
+        created_at:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    UsageSummary:
+      type: object
+      description: Aggregated usage over the trailing window (default 30 days).
+      properties:
+        requests:
+          type: integer
+          description: Total billed units in the window.
+          example: 1280
+        billed_micros:
+          type: integer
+          description: Total billed amount over the window, in microdollars.
+          example: 5120000
+        billed_usd:
+          type: string
+          description: Same billed amount as a 2-decimal USD string.
+          example: '5.12'
+    ApiKeyView:
+      type: object
+      description: Display-only view of an API key (§4.4). Raw key material and hashes are never returned.
+      properties:
+        id:
+          type: string
+          format: uuid
+        key_prefix:
+          type: string
+          example: nol_8f3c2a1b
+        name:
+          type: string
+        tenant_id:
+          type:
+          - string
+          - 'null'
+          format: uuid
+          description: Non-null for tenant sub-keys.
+        tier:
+          type: string
+          enum:
+          - free
+          - standard
+          - enterprise
+        allowed_use_cases:
+          type: array
+          items:
+            type: string
+        rate_limit:
+          type: integer
+          description: Requests per 60-second window.
+        requests_total:
+          type: integer
+        last_used_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+        disabled:
+          type: boolean
+        require_signed_requests:
+          type: boolean
+        rotation_grace_expires_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: Non-null while a rotation grace window is open (the previous key still validates until then).
+        created_at:
+          type: string
+          format: date-time
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

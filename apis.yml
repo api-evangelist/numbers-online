@@ -9,6 +9,22 @@ description: 'Numbers Online is a phone-number trust and intelligence service op
   a multi-tenant MSP control plane, and a hosted read-only MCP server plus Vapi/Retell webhooks for AI voice agents.
   The 56-operation REST API is published as an OpenAPI 3.0.3 contract at /api/spec, with an llms.txt, an A2A agent
   card at /.well-known/agent-card.json, markdown mirrors of the docs, and a self-service free tier with no card.'
+deliveryModel:
+  model: saas
+  license_evidence:
+    not_product:
+    - numbers-online/numbers-online-mcp
+  open_source: unknown
+  commercial: true
+  callable_host: true
+  label: Hosted service · you call their endpoint
+  confidence: low
+  source:
+  - openapi
+  - pricing
+  - repository-not-product
+  generated: '2026-09-25'
+  method: derived
 image: https://numbers.online/android-chrome-512x512.png
 url: https://raw.githubusercontent.com/api-evangelist/numbers-online/refs/heads/main/apis.yml
 x-type: company
@@ -28,34 +44,105 @@ tags:
 - Telephony
 - STIR/SHAKEN
 - MCP
+- Agent-Native
+- Compliance
+- Company
+- A2A
+tags_raw:
+- Phone Intelligence
+- Caller ID
+- CNAM
+- Reverse Phone Lookup
+- Spam Detection
+- Do Not Call
+- Telephony
+- STIR/SHAKEN
+- MCP
 - agent-native
 - Compliance
 - Company
+- A2A
 apis:
-- aid: numbers-online:numbers-online-phone-intelligence-api
-  name: Numbers Online Phone Intelligence API
-  description: 'One REST API over a single E.164 primitive: parse and validate numbers, single and bulk lookup (line
-    type, range carrier, CNAM, STIR/SHAKEN verstat and a supplementary spam signal), signed inbound caller intelligence
-    with single-use receipts, outbound pre-call do-not-contact scrub and call-provenance enrollment, consent-first
-    list scrubbing, prepaid accounts and key lifecycle, a ClearIP-compatible SBC/SIP redirect decision, operator
-    HMAC signing, a signed FCC robocall-mitigation evidence bundle, and a multi-tenant MSP control plane. Keys are
-    self-service (POST /api/v1/account/signup), sent as X-API-Key or Authorization: Bearer; the free tier is rate-limited
-    and unbilled, the standard tier is prepaid per dip.'
+- aid: numbers-online:numbers-online-mcp-server
+  name: Numbers Online MCP Server
+  description: >-
+    A hosted, stateless, read-only Model Context Protocol server (JSON-RPC 2.0 over Streamable HTTP, protocol
+    2025-06-18) at POST https://numbers.online/api/v1/mcp for AI voice agents (Vapi, Retell, Pipecat,
+    LiveKit). initialize, ping and tools/list are public; tools/call requires an API key with the mcp
+    use case. Live tools/list returns phone_lookup, line_type, caller_risk and dnc_check, each annotated
+    readOnlyHint/idempotentHint. Every output is a supplementary, low-confidence signal; the calling agent
+    keeps every routing and dialing decision. Billed $0.015 per tool call on the standard tier.
+  image: https://numbers.online/android-chrome-512x512.png
+  humanURL: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - MCP
+  - Agent-Native
+  - Phone Intelligence
+  tags_raw:
+  - MCP
+  - agent-native
+  - Phone Intelligence
+  properties:
+  - type: MCPServer
+    url: mcp/numbers-online-mcp.yml
+  - type: MCPServer
+    url: https://numbers.online/api/v1/mcp
+  - type: Documentation
+    url: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+  - type: ToolCrosswalk
+    url: mcp/numbers-online-tool-crosswalk.yml
+  - type: GitHubRepository
+    url: https://github.com/numbers-online/numbers-online-mcp
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: AgentCard
+    url: a2a/numbers-online-a2a.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+- aid: numbers-online:numbers-online-a2a-agent
+  name: Numbers Online A2A Agent
+  description: >-
+    An Agent-to-Agent (A2A protocolVersion 0.3.0, JSONRPC) endpoint at POST https://numbers.online/api/v1/a2a
+    exposing four read-only skills — phone_lookup, line_type, caller_risk and dnc_check — the same capabilities
+    as the MCP tools. Discovered via the provider-served agent card at /.well-known/agent-card.json (also
+    /.well-known/agent.json and /api/agent-card). Bearer API key with the mcp use case; anonymous message/send
+    returns 401 missing_key and GET returns 405. This endpoint is not described in the OpenAPI.
   image: https://numbers.online/android-chrome-512x512.png
   humanURL: https://numbers.online/docs
-  baseURL: https://numbers.online
+  baseURL: https://numbers.online/api/v1/a2a
   tags:
+  - A2A
+  - Agent-Native
   - Phone Intelligence
-  - Caller ID
-  - CNAM
-  - Do Not Call
-  - Telephony
+  tags_raw:
+  - A2A
+  - agent-native
+  - Phone Intelligence
+  properties:
+  - type: AgentCard
+    url: a2a/numbers-online-a2a.yml
+  - type: AgentCard
+    url: https://numbers.online/.well-known/agent-card.json
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: ToolCrosswalk
+    url: mcp/numbers-online-tool-crosswalk.yml
+- aid: numbers-online:numbers-online-account-api
+  name: Numbers Online Account API
+  description: >-
+    Self-service API account: signup, balance, usage, credit top-ups, and the key lifecycle. Account-management
+    endpoints require an account-level key with the 'manage' use case (every self-service key holds it
+    unless deliberately narrowed; the per-key signing config is exempt).
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Account
   properties:
   - type: OpenAPI
-    url: openapi/numbers-online-openapi.yml
-  - type: OpenAPI
-    name: Provider-hosted OpenAPI 3.0.3 (source of truth)
-    url: https://numbers.online/api/spec
+    url: openapi/numbers-online-account-api-openapi.yml
   - type: Documentation
     url: https://numbers.online/docs
   - type: APIReference
@@ -84,75 +171,670 @@ apis:
     url: data-model/numbers-online-data-model.yml
   - type: Conformance
     url: conformance/numbers-online-conformance.yml
-  - type: Overlay
-    url: overlays/numbers-online-openapi-overlay.yaml
   - type: AgenticAccess
     url: agentic-access/numbers-online-agentic-access.yml
   - type: LLMsTxt
     url: https://numbers.online/llms.txt
-  - type: AgentSkill
-    url: skills/_index.yml
   - type: Pricing
     url: https://numbers.online/pricing
   - type: SignUp
     url: https://numbers.online/developers
-- aid: numbers-online:numbers-online-mcp-server
-  name: Numbers Online MCP Server
-  description: A hosted, stateless, read-only Model Context Protocol server (JSON-RPC 2.0 over Streamable HTTP,
-    protocol 2025-06-18) at POST https://numbers.online/api/v1/mcp for AI voice agents (Vapi, Retell, Pipecat, LiveKit).
-    initialize, ping and tools/list are public; tools/call requires an API key with the mcp use case. Live tools/list
-    returns phone_lookup, line_type, caller_risk and dnc_check, each annotated readOnlyHint/idempotentHint. Every
-    output is a supplementary, low-confidence signal; the calling agent keeps every routing and dialing decision.
-    Billed $0.015 per tool call on the standard tier.
-  image: https://numbers.online/android-chrome-512x512.png
-  humanURL: https://numbers.online/docs/integrations/ai-voice-agents-mcp
+- aid: numbers-online:numbers-online-community-reporting-api
+  name: Numbers Online Community reporting API
+  description: >-
+    Key-gated spam/scam reporting — the give-to-get half of the community sensor (receipt-gated, tags-only,
+    lane-scoped supplementary signals)
+  humanURL: https://numbers.online/docs
   baseURL: https://numbers.online/api/v1/mcp
   tags:
-  - MCP
-  - agent-native
-  - Phone Intelligence
+  - Community reporting
   properties:
-  - type: MCPServer
-    url: mcp/numbers-online-mcp.yml
-  - type: MCPServer
-    url: https://numbers.online/api/v1/mcp
+  - type: OpenAPI
+    url: openapi/numbers-online-community-reporting-api-openapi.yml
   - type: Documentation
-    url: https://numbers.online/docs/integrations/ai-voice-agents-mcp
-  - type: ToolCrosswalk
-    url: mcp/numbers-online-tool-crosswalk.yml
-  - type: GitHubRepository
-    url: https://github.com/numbers-online/numbers-online-mcp
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
   - type: Authentication
     url: authentication/numbers-online-authentication.yml
-  - type: AgentCard
-    url: a2a/numbers-online-a2a.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
   - type: RateLimits
     url: rate-limits/numbers-online-rate-limits.yml
   - type: Plans
     url: plans/numbers-online-plans-pricing.yml
-- aid: numbers-online:numbers-online-a2a-agent
-  name: Numbers Online A2A Agent
-  description: An Agent-to-Agent (A2A protocolVersion 0.3.0, JSONRPC) endpoint at POST https://numbers.online/api/v1/a2a
-    exposing four read-only skills — phone_lookup, line_type, caller_risk and dnc_check — the same capabilities
-    as the MCP tools. Discovered via the provider-served agent card at /.well-known/agent-card.json (also /.well-known/agent.json
-    and /api/agent-card). Bearer API key with the mcp use case; anonymous message/send returns 401 missing_key and
-    GET returns 405. This endpoint is not described in the OpenAPI.
-  image: https://numbers.online/android-chrome-512x512.png
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-inbound-api
+  name: Numbers Online Inbound API
+  description: Inbound caller-intelligence lookup for operators, PBX, and softphones
   humanURL: https://numbers.online/docs
-  baseURL: https://numbers.online/api/v1/a2a
+  baseURL: https://numbers.online/api/v1/mcp
   tags:
-  - A2A
-  - agent-native
-  - Phone Intelligence
+  - Inbound
   properties:
-  - type: AgentCard
-    url: a2a/numbers-online-a2a.yml
-  - type: AgentCard
-    url: https://numbers.online/.well-known/agent-card.json
+  - type: OpenAPI
+    url: openapi/numbers-online-inbound-api-openapi.yml
   - type: Documentation
     url: https://numbers.online/docs
-  - type: ToolCrosswalk
-    url: mcp/numbers-online-tool-crosswalk.yml
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-lookup-api
+  name: Numbers Online Lookup API
+  description: 'Number lookup: line type, range carrier, CNAM, verstat, and a supplementary spam signal'
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Lookup
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-lookup-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-mcp-api
+  name: Numbers Online MCP API
+  description: >-
+    Model Context Protocol server for AI voice agents (Vapi, Retell, Pipecat, LiveKit): read-only phone-intelligence
+    tools over Streamable HTTP
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - MCP
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-mcp-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-msp-api
+  name: Numbers Online MSP API
+  description: >-
+    Multi-tenant control plane: per-tenant sub-keys, usage rollups, and suppression lists for MSPs and
+    PBX resellers
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - MSP
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-msp-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-outbound-api
+  name: Numbers Online Outbound API
+  description: >-
+    Outbound pre-call checks (scrub + call-provenance) and number enrollment for spoofing-defense
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Outbound
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-outbound-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-parsing-api
+  name: Numbers Online Parsing API
+  description: Phone number parsing and validation endpoints
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Parsing
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-parsing-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-pbx-api
+  name: Numbers Online PBX API
+  description: >-
+    Plain-text caller-id lookup for header-less PBX integrations (FreeSWITCH mod_cidlookup and similar)
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - PBX
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-pbx-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-receipts-api
+  name: Numbers Online Receipts API
+  description: Signed, privacy-safe lookup receipts (Ed25519) — verifiable "checked as of T" evidence
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Receipts
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-receipts-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-reference-api
+  name: Numbers Online Reference API
+  description: Reference data and examples
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Reference
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-reference-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-sbc-sip-api
+  name: Numbers Online SBC / SIP API
+  description: >-
+    SIP redirect-server decisions for session border controllers (Kamailio, OpenSIPS, dSIPRouter, Sansay,
+    Oracle/Acme Packet, ProSBC) via the operator-run shim recipe, plus an FCC robocall-mitigation evidence
+    bundle — a supplementary call-setup signal, fail-open
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - SBC / SIP
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-sbc-sip-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-system-api
+  name: Numbers Online System API
+  description: Operational endpoints (health checks)
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - System
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-system-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-trust-api
+  name: Numbers Online Trust API
+  description: Contact-suppression preference lookups
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Trust
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-trust-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
+- aid: numbers-online:numbers-online-webhooks-api
+  name: Numbers Online Webhooks API
+  description: >-
+    AI-voice-agent webhook adapters (Retell inbound, Vapi custom tool) over the same lookup backend
+  humanURL: https://numbers.online/docs
+  baseURL: https://numbers.online/api/v1/mcp
+  tags:
+  - Webhooks
+  properties:
+  - type: OpenAPI
+    url: openapi/numbers-online-webhooks-api-openapi.yml
+  - type: Documentation
+    url: https://numbers.online/docs
+  - type: APIReference
+    url: https://numbers.online/docs
+  - type: GettingStarted
+    url: https://numbers.online/developers
+  - type: Guides
+    url: https://numbers.online/docs/integrations
+  - type: Authentication
+    url: authentication/numbers-online-authentication.yml
+  - type: Conventions
+    url: conventions/numbers-online-conventions.yml
+  - type: Idempotency
+    url: conventions/numbers-online-conventions.yml
+  - type: ErrorCatalog
+    url: errors/numbers-online-problem-types.yml
+  - type: RateLimits
+    url: rate-limits/numbers-online-rate-limits.yml
+  - type: Plans
+    url: plans/numbers-online-plans-pricing.yml
+  - type: Lifecycle
+    url: lifecycle/numbers-online-lifecycle.yml
+  - type: ChangeLog
+    url: changelog/numbers-online-changelog.yml
+  - type: DataModel
+    url: data-model/numbers-online-data-model.yml
+  - type: Conformance
+    url: conformance/numbers-online-conformance.yml
+  - type: AgenticAccess
+    url: agentic-access/numbers-online-agentic-access.yml
+  - type: LLMsTxt
+    url: https://numbers.online/llms.txt
+  - type: Pricing
+    url: https://numbers.online/pricing
+  - type: SignUp
+    url: https://numbers.online/developers
 maintainers:
 - FN: Kin Lane
   email: kin@apievangelist.com
@@ -263,3 +945,10 @@ x-enrichment:
   status: enriched
   artifacts_added: 31
   pass: local-v3
+x-a2a:
+  verified: true
+  probed: '2026-09-26'
+  url: "https://numbers.online/.well-known/agent-card.json"
+  grade: "conformant"
+  protocol_version: "0.3.0"
+  control: 404

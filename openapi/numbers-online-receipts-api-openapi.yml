@@ -1,0 +1,215 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Receipts API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Receipts across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Receipts
+  description: Signed, privacy-safe lookup receipts (Ed25519) — verifiable "checked as of T" evidence
+paths:
+  /api/v1/receipts/{id}:
+    get:
+      tags:
+      - Receipts
+      summary: Retrieve a signed lookup receipt
+      description: 'Fetch a signed, privacy-safe receipt by its unguessable id (the id is the capability — no API key needed, so TCPA-defense evidence can be shared with counsel). PII-free: the number appears only as number_hash. Verify response_signature over signed_payload with the Ed25519 key from GET /api/v1/publickey, then recompute sha256(your number) and match it against number_hash. A supplementary signal, not a compliance assertion.'
+      operationId: getReceipt
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          example: nol_rec_8sd91kfh20aJ
+      responses:
+        '200':
+          description: The signed receipt.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Receipt'
+        '404':
+          description: No receipt with that id.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/publickey:
+    get:
+      tags:
+      - Receipts
+      summary: Ed25519 signing public key
+      description: The Ed25519 public key (SPKI PEM) used to sign inbound-lookup responses and lookup receipts, so any verifier can check a signature without out-of-band key exchange. NO AUTH. public_key_pem is null when no signing key is configured (responses ship "unsigned").
+      operationId: publicKey
+      responses:
+        '200':
+          description: The public key.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  algorithm:
+                    type: string
+                    example: ed25519
+                  public_key_pem:
+                    type:
+                    - string
+                    - 'null'
+                    example: '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    Receipt:
+      type: object
+      description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
+      properties:
+        receipt_id:
+          type: string
+          example: nol_rec_8sd91kfh20aJ
+        schema_version:
+          type:
+          - string
+          - 'null'
+          example: '2026-06-03'
+        number_hash:
+          type: string
+          description: SHA-256 hex of the E.164 — the only number representation stored.
+        line_type:
+          type:
+          - string
+          - 'null'
+          example: mobile
+        dnc_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - not_listed
+          - listed
+          - unknown
+          description: Supplementary do-not-call signal; "unknown" until a data partner is configured.
+        reassigned_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - 'no'
+          - 'yes'
+          - unknown
+        context:
+          type:
+          - string
+          - 'null'
+          example: mcp:dnc_check
+        checked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: The "as of T" the receipt cryptographically binds.
+        created_at:
+          type: string
+          format: date-time
+        signed_payload:
+          type:
+          - string
+          - 'null'
+          description: The exact canonical JSON that was signed (commits to number_hash).
+        response_signature:
+          type:
+          - string
+          - 'null'
+          description: '''ed25519:<base64>'', or ''unsigned''.'
+        verification:
+          type: object
+          properties:
+            algorithm:
+              type: string
+              example: ed25519
+            public_key_url:
+              type: string
+              example: https://numbers.online/api/v1/publickey
+            instructions:
+              type: string
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

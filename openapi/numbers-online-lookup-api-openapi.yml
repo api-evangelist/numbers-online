@@ -1,0 +1,546 @@
+openapi: 3.2.0
+info:
+  title: Numbers Online Lookup API
+  version: 1.0.0
+  contact:
+    name: Phone Numbers Online
+    url: https://numbers.online
+  x-refined-note:
+  - x-apievangelist-provenance differs across the merged source definitions and was not carried
+  description: 'Operations tagged Lookup across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
+servers:
+- url: https://numbers.online
+  description: Production server
+- url: http://localhost:3000
+  description: Development server
+tags:
+- name: Lookup
+  description: 'Number lookup: line type, range carrier, CNAM, verstat, and a supplementary spam signal'
+paths:
+  /api/v1/lookup/{e164}:
+    get:
+      tags:
+      - Lookup
+      summary: Look up a single number
+      description: 'Single-number lookup returning the uniform §2 response shape: deterministic parse fields (validity, formats, line type, range carrier, country) plus cache-aware CNAM, a normalized STIR/SHAKEN verstat, and a supplementary low-confidence spam signal. All enrichment is fail-open — a slow or failing supplier nulls that field rather than erroring. The shape is identical for known and unknown numbers (anti-enumeration). Invalid input returns **200** with `valid: false` and null fields (NOT 404) and is not billed. Requires an API key with the `lookup` use case. Billing (standard tier): `$0.004` when a fresh wholesale CNAM dip is performed, `$0.002` when served without one (CNAM cache hit, or no CNAM supplier configured). The free tier is not billed (rate-limited instead). Billed responses are returned with `Cache-Control: no-store` — the `cached` field and `max_cache_age` param are the cache contract.'
+      operationId: lookupNumber
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: e164
+        in: path
+        required: true
+        description: The number to look up, as a full E.164 string (`+14155552671`), its URL-encoded form (`%2B14155552671`), or a bare digit slug (`14155552671`).
+        schema:
+          type: string
+        example: '+14155552671'
+      - name: verstat
+        in: query
+        required: false
+        description: STIR/SHAKEN verstat passthrough — a bare token (e.g. `TN-Validation-Passed`), a `verstat=...` parameter, or a full SIP/tel header value. Normalized to `verified` / `unverified` / `unknown` in the response. Absence of validation is NOT a failed validation (maps to `unknown`).
+        schema:
+          type: string
+        example: TN-Validation-Passed
+      - name: max_cache_age
+        in: query
+        required: false
+        description: 'Operator TTL control: the maximum acceptable CNAM cache age in seconds. A cached value older than this triggers a fresh wholesale dip; `0` forces a fresh dip (which is billed at the `$0.004` rate).'
+        schema:
+          type: integer
+          minimum: 0
+        example: 86400
+      - name: Idempotency-Key
+        in: header
+        required: false
+        description: Optional client-supplied request id for at-most-once billing on retries. Repeated requests with the same key are not double-billed.
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Lookup result (uniform shape for valid, invalid, known, and unknown numbers).
+          headers:
+            Cache-Control:
+              description: Always `no-store` — the response is per-request and billed.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupResponse'
+        '400':
+          description: Malformed path (not a usable E.164 number)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/lookup/batch:
+    post:
+      tags:
+      - Lookup
+      summary: Look up multiple numbers
+      description: 'Bulk number lookup for list processing. Submit up to 100 numbers; results are returned in input order, each as the same shape as the single lookup. This is a list-processing surface, not a call-path surface — for large batches the supplier dips run with bounded concurrency and can take seconds. Requires an API key with the `lookup` use case. Billing (standard tier) is per VALID number, split by what was delivered: `$0.004` for each number that triggered a fresh wholesale CNAM dip and `$0.002` for each served without one; invalid numbers are free. The free tier is not billed (rate-limited instead). Use the `Idempotency-Key` header for at-most-once billing on retries.'
+      operationId: lookupNumberBatch
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        description: Optional client-supplied request id for at-most-once billing on retries.
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - numbers
+              properties:
+                numbers:
+                  type: array
+                  items:
+                    type: string
+                  minItems: 1
+                  maxItems: 100
+                  description: Numbers to look up (E.164 recommended). Maximum 100 per request.
+                  example:
+                  - '+14155552671'
+                  - '+442071234567'
+                verstat:
+                  type: string
+                  description: STIR/SHAKEN verstat passthrough applied to every number in the batch. Same accepted forms as the single-lookup query param.
+                  example: TN-Validation-Passed
+                max_cache_age:
+                  type: integer
+                  minimum: 0
+                  description: 'Operator TTL control: maximum acceptable CNAM cache age in seconds; `0` forces a fresh dip.'
+                  example: 86400
+      responses:
+        '200':
+          description: Per-number lookup results plus a batch billing summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LookupBatchResponse'
+        '400':
+          description: Invalid request (missing/empty `numbers`, over 100, or malformed JSON)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '402':
+          $ref: '#/components/responses/InsufficientBalance'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+  /api/v1/lookup/changes:
+    get:
+      tags:
+      - Lookup
+      summary: Reputation-change feed
+      description: 'Poll the numbers whose scraped-intel rollup was updated since a cursor, so cached lookups can be refreshed when the underlying intel moves instead of on a blind timer. Returns up to `limit` entries ordered by update time (ascending) plus a `cursor` — pass it as the next request''s `since`; with no `since`, returns the last hour. Two caveats to build against: (1) an entry means the number''s intel row was re-written by ingestion, which includes re-observations that left every value unchanged — treat it as a refresh hint, not proof of movement; (2) ingest batches stamp many rows with one identical update timestamp and the cursor is a strict greater-than, so a page boundary landing inside such a batch skips its remaining same-timestamp rows — use `limit=1000` (the maximum) so pages rarely split a batch. The values are the intel layer''s own signal, a re-dip HINT: the authoritative blended score is still `GET /api/v1/lookup/{e164}`, so the intended loop is poll changes → re-dip the numbers you care about, while still honoring the Terms §7 caching bounds (refresh or drop cached responses within 30 days even when no entry arrives). Not separately metered — it rides the account''s normal API access and per-key rate limits. Requires the `lookup` use case.'
+      operationId: lookupChanges
+      security:
+      - ApiKeyAuth: []
+      - BearerAuth: []
+      parameters:
+      - name: since
+        in: query
+        required: false
+        description: ISO-8601 cursor — use the previous response's `cursor`. Defaults to one hour ago.
+        schema:
+          type: string
+          format: date-time
+        example: '2026-08-01T00:00:00.000Z'
+      - name: limit
+        in: query
+        required: false
+        description: Maximum changes per page (default 100, max 1000).
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 100
+      responses:
+        '200':
+          description: Numbers whose intel reputation changed since the cursor, oldest change first.
+          headers:
+            Cache-Control:
+              description: Always `no-store` — the feed is a live cursor read.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  since:
+                    type: string
+                    format: date-time
+                    description: The cursor this page was read from.
+                  cursor:
+                    type: string
+                    format: date-time
+                    description: The max change time in this page — pass as the next request's `since`.
+                  count:
+                    type: integer
+                  has_more:
+                    type: boolean
+                    description: True when the page filled `limit`; poll again immediately with `cursor`. Prefer `limit=1000` so a page boundary rarely lands inside one ingest batch (see the endpoint description).
+                  changes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        e164:
+                          type: string
+                          example: '+14155551212'
+                        risk_score:
+                          type:
+                          - integer
+                          - 'null'
+                          description: Intel-layer weighted risk 0–100 (higher = worse) — a supplementary re-dip hint, NOT the blended lookup score.
+                        risk_level:
+                          type: string
+                          enum:
+                          - low
+                          - medium
+                          - high
+                          - unknown
+                        top_category:
+                          type:
+                          - string
+                          - 'null'
+                        total_reports:
+                          type: integer
+                        has_verified_regulator:
+                          type: boolean
+                        last_observed_at:
+                          type:
+                          - string
+                          - 'null'
+                          format: date-time
+                        changed_at:
+                          type: string
+                          format: date-time
+        '400':
+          description: Malformed `since` (must be ISO-8601 — use the previous response's `cursor`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '503':
+          description: Change feed temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    servers:
+    - url: https://numbers.online
+      description: Production server
+    - url: http://localhost:3000
+      description: Development server
+components:
+  schemas:
+    RiskView:
+      type: object
+      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
+      properties:
+        score:
+          type:
+          - integer
+          - 'null'
+          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
+        level:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - unknown
+          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
+        model:
+          type:
+          - string
+          - 'null'
+          enum:
+          - first_party_plus_restricted_sources
+          - first_party_plus_external
+          - dial_structural
+          - null
+          description: Which scoring pipeline produced the score; null when score is null.
+    InsufficientBalance:
+      type: object
+      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
+      properties:
+        error:
+          type: string
+          example: Insufficient prepaid balance for this request.
+        code:
+          type: string
+          enum:
+          - insufficient_balance
+          description: Stable machine-readable code (added 2026-06-12).
+        balance_micros:
+          type:
+          - integer
+          - 'null'
+          description: Remaining balance in microdollars (may be 0 or null).
+          example: 0
+        topup:
+          type: string
+          description: How to add credit (prose; prefer the structured siblings).
+          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
+        topup_url:
+          type: string
+          example: /api/v1/account/topup
+          description: Top-up endpoint path.
+        topup_min_cents:
+          type: integer
+          example: 500
+          description: Minimum top-up amount in cents.
+    LookupResponse:
+      type: object
+      description: 'Uniform number-lookup result. The same shape is returned for valid, invalid, known, and unknown numbers (anti-enumeration). Invalid input yields `valid: false` with the deterministic fields (`e164`, `formatted`, `line_type`, `carrier`, `country`) null, `verstat` `unknown`, `confidence` `low`, and `spam_score` null. Enrichment fields (`cnam`, `spam_score`) are fail-open — they null out on a supplier/scoring error rather than failing the request.'
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-03'
+          description: Shape version (date-stamped, unique per shape). Additive changes never bump it; remove/rename/retype does.
+        e164:
+          type:
+          - string
+          - 'null'
+          description: Canonical E.164 number, or null when the input is invalid.
+          example: '+14155552671'
+        valid:
+          type: boolean
+          description: Whether the input is a valid number.
+        formatted:
+          type: object
+          description: Display formats; both null when invalid.
+          properties:
+            national:
+              type:
+              - string
+              - 'null'
+              example: (415) 555-2671
+            international:
+              type:
+              - string
+              - 'null'
+              example: +1 415-555-2671
+        line_type:
+          type:
+          - string
+          - 'null'
+          description: Lowercased line type ('mobile', 'fixed_line', 'voip', …), or null when indeterminate.
+        carrier:
+          type:
+          - string
+          - 'null'
+          description: Carrier of the number RANGE (original allocation, NOT porting-aware) — a supplementary signal.
+        country:
+          type:
+          - string
+          - 'null'
+          description: ISO 3166-1 alpha-2 country code.
+          example: US
+        cnam:
+          type:
+          - string
+          - 'null'
+          description: 'Caller name (CNAM), or null when unavailable or not dipped. Privacy carve-out: the name of an individual who has verified their personal number on Numbers Online is never returned (same invariant as the Inbound API''s ''Verified & online'' rule).'
+        verstat:
+          type: string
+          enum:
+          - verified
+          - unverified
+          - unknown
+          description: Normalized STIR/SHAKEN verstat. `unknown` when no validation was performed or none was supplied.
+        spam_score:
+          type:
+          - integer
+          - 'null'
+          minimum: 1
+          maximum: 99
+          description: Supplementary low-confidence spam signal on a 1–99 scale (higher = riskier); null when no signal is available. FROZEN field name — `risk` is the disclosed read.
+        risk:
+          $ref: '#/components/schemas/RiskView'
+        confidence:
+          type: string
+          enum:
+          - low
+          description: Confidence label for the supplementary signals — always `low`.
+        cached:
+          type: boolean
+          description: True when CNAM was served from cache (no fresh supplier dip — billed at the cheaper rate).
+        sources:
+          type: object
+          description: Per-field data provenance (resale transparency).
+          properties:
+            carrier:
+              type:
+              - string
+              - 'null'
+              enum:
+              - number_range_allocation
+              - null
+              description: Provenance of the carrier field.
+            cnam:
+              type:
+              - string
+              - 'null'
+              enum:
+              - wholesale_cnam
+              - cache
+              - null
+              description: Provenance of the CNAM field.
+            spam_score:
+              type:
+              - string
+              - 'null'
+              description: Provenance of the spam signal (e.g. 'baseline_prior' or a '+'-joined basis list); null when no signal.
+        as_of:
+          type: string
+          format: date-time
+          description: Timestamp the lookup was assembled.
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    LookupBatchResponse:
+      type: object
+      description: 'Bulk lookup result: one entry per submitted number (input order) plus a billing summary.'
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-12'
+          description: Version of the batch ENVELOPE (results/summary wrapper); each per-number result carries its own schema_version.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LookupResponse'
+          description: Per-number lookup results, in the order the numbers were submitted.
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Numbers submitted.
+            valid:
+              type: integer
+              description: Numbers that parsed as valid (includes tenant-suppressed numbers, which are valid but not billed).
+            invalid:
+              type: integer
+              description: Numbers that were invalid (not billed).
+            suppressed:
+              type: integer
+              description: 'Valid numbers on the calling tenant''s suppression list: returned with deterministic fields only (no enrichment) and not billed.'
+            billed_fresh_cnam:
+              type: integer
+              description: Valid numbers billed at $0.004 (fresh wholesale CNAM dip).
+            billed_enriched:
+              type: integer
+              description: Valid numbers billed at $0.002 (cache hit or no CNAM supplier).
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InsufficientBalance:
+      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InsufficientBalance'
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Bearer token authentication
+    CidQueryKeyAuth:
+      type: apiKey
+      in: query
+      name: key
+      description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
+x-refined-from:
+- numbers-online-openapi.json
+- numbers-online-openapi.yml

@@ -1,3 +1,5 @@
+# x-archived-from: numbers-online-openapi.yml
+# x-archived-on: 2026-09-26
 openapi: 3.0.3
 info:
   title: Numbers Online Phone Intelligence API

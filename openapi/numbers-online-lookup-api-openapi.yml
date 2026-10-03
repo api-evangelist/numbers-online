@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online Lookup API
+  title: Numbers Online Phone Intelligence Lookup API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged Lookup across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -85,11 +83,6 @@ paths:
           $ref: '#/components/responses/InsufficientBalance'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/lookup/batch:
     post:
       tags:
@@ -158,11 +151,6 @@ paths:
           $ref: '#/components/responses/InsufficientBalance'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/lookup/changes:
     get:
       tags:
@@ -274,11 +262,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   schemas:
     RiskView:
@@ -308,36 +291,40 @@ components:
           - dial_structural
           - null
           description: Which scoring pipeline produced the score; null when score is null.
-    InsufficientBalance:
+    LookupBatchResponse:
       type: object
-      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
+      description: 'Bulk lookup result: one entry per submitted number (input order) plus a billing summary.'
       properties:
-        error:
+        schema_version:
           type: string
-          example: Insufficient prepaid balance for this request.
-        code:
-          type: string
-          enum:
-          - insufficient_balance
-          description: Stable machine-readable code (added 2026-06-12).
-        balance_micros:
-          type:
-          - integer
-          - 'null'
-          description: Remaining balance in microdollars (may be 0 or null).
-          example: 0
-        topup:
-          type: string
-          description: How to add credit (prose; prefer the structured siblings).
-          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
-        topup_url:
-          type: string
-          example: /api/v1/account/topup
-          description: Top-up endpoint path.
-        topup_min_cents:
-          type: integer
-          example: 500
-          description: Minimum top-up amount in cents.
+          example: '2026-06-12'
+          description: Version of the batch ENVELOPE (results/summary wrapper); each per-number result carries its own schema_version.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LookupResponse'
+          description: Per-number lookup results, in the order the numbers were submitted.
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Numbers submitted.
+            valid:
+              type: integer
+              description: Numbers that parsed as valid (includes tenant-suppressed numbers, which are valid but not billed).
+            invalid:
+              type: integer
+              description: Numbers that were invalid (not billed).
+            suppressed:
+              type: integer
+              description: 'Valid numbers on the calling tenant''s suppression list: returned with deterministic fields only (no enrichment) and not billed.'
+            billed_fresh_cnam:
+              type: integer
+              description: Valid numbers billed at $0.004 (fresh wholesale CNAM dip).
+            billed_enriched:
+              type: integer
+              description: Valid numbers billed at $0.002 (cache hit or no CNAM supplier).
     LookupResponse:
       type: object
       description: 'Uniform number-lookup result. The same shape is returned for valid, invalid, known, and unknown numbers (anti-enumeration). Invalid input yields `valid: false` with the deterministic fields (`e164`, `formatted`, `line_type`, `carrier`, `country`) null, `verstat` `unknown`, `confidence` `low`, and `spam_score` null. Enrichment fields (`cnam`, `spam_score`) are fail-open — they null out on a supplier/scoring error rather than failing the request.'
@@ -474,40 +461,36 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-    LookupBatchResponse:
+    InsufficientBalance:
       type: object
-      description: 'Bulk lookup result: one entry per submitted number (input order) plus a billing summary.'
+      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
       properties:
-        schema_version:
+        error:
           type: string
-          example: '2026-06-12'
-          description: Version of the batch ENVELOPE (results/summary wrapper); each per-number result carries its own schema_version.
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/LookupResponse'
-          description: Per-number lookup results, in the order the numbers were submitted.
-        summary:
-          type: object
-          properties:
-            total:
-              type: integer
-              description: Numbers submitted.
-            valid:
-              type: integer
-              description: Numbers that parsed as valid (includes tenant-suppressed numbers, which are valid but not billed).
-            invalid:
-              type: integer
-              description: Numbers that were invalid (not billed).
-            suppressed:
-              type: integer
-              description: 'Valid numbers on the calling tenant''s suppression list: returned with deterministic fields only (no enrichment) and not billed.'
-            billed_fresh_cnam:
-              type: integer
-              description: Valid numbers billed at $0.004 (fresh wholesale CNAM dip).
-            billed_enriched:
-              type: integer
-              description: Valid numbers billed at $0.002 (cache hit or no CNAM supplier).
+          example: Insufficient prepaid balance for this request.
+        code:
+          type: string
+          enum:
+          - insufficient_balance
+          description: Stable machine-readable code (added 2026-06-12).
+        balance_micros:
+          type:
+          - integer
+          - 'null'
+          description: Remaining balance in microdollars (may be 0 or null).
+          example: 0
+        topup:
+          type: string
+          description: How to add credit (prose; prefer the structured siblings).
+          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
+        topup_url:
+          type: string
+          example: /api/v1/account/topup
+          description: Top-up endpoint path.
+        topup_min_cents:
+          type: integer
+          example: 500
+          description: Minimum top-up amount in cents.
   responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
@@ -541,6 +524,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

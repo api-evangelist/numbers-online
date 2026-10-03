@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online Outbound API
+  title: Numbers Online Phone Intelligence Outbound API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged Outbound across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -175,11 +173,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/outbound/enroll:
     post:
       tags:
@@ -249,11 +242,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/precall/lookup:
     post:
       tags:
@@ -302,11 +290,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/precall/enroll:
     post:
       tags:
@@ -360,11 +343,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   responses:
     RateLimited:
@@ -379,6 +357,19 @@ components:
           schema:
             $ref: '#/components/schemas/Error'
   schemas:
+    LaneUsd:
+      type: object
+      description: A min/avg/max spread for one pricing lane, as decimal USD strings.
+      properties:
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
     Error:
       type: object
       properties:
@@ -409,56 +400,6 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-    LaneUsd:
-      type: object
-      description: A min/avg/max spread for one pricing lane, as decimal USD strings.
-      properties:
-        min_usd:
-          type: string
-          example: '0.0072'
-        avg_usd:
-          type: string
-          example: '0.0146'
-        max_usd:
-          type: string
-          example: '0.32'
-    ProviderCost:
-      type: object
-      description: 'One named, publicly-displayable provider''s slice of the aggregate. Anonymous sources never appear here — they stay inside the channel-level numbers only. The lane fields present depend on the channel: a voice cost carries `international`/`local`, an SMS cost carries `person`/`application`; each is null when that provider''s decks do not split that way.'
-      properties:
-        name:
-          type: string
-          example: DIDWW
-        domain:
-          type:
-          - string
-          - 'null'
-          example: didww.com
-        min_usd:
-          type: string
-          example: '0.0072'
-        avg_usd:
-          type: string
-          example: '0.0146'
-        max_usd:
-          type: string
-          example: '0.32'
-        international:
-          allOf:
-          - $ref: '#/components/schemas/LaneUsd'
-          description: 'Voice: international lanes (default + origin-based).'
-        local:
-          allOf:
-          - $ref: '#/components/schemas/LaneUsd'
-          description: 'Voice: in-country lanes.'
-        person:
-          allOf:
-          - $ref: '#/components/schemas/LaneUsd'
-          description: 'SMS: person-originated (P2P) decks.'
-        application:
-          allOf:
-          - $ref: '#/components/schemas/LaneUsd'
-          description: 'SMS: application-originated (A2P) decks.'
     ChannelCost:
       type: object
       description: 'Indicative RETAIL cost to reach a destination on ONE channel, aggregated across provider price-list decks. All amounts are decimal USD strings (money is integer micro-USD internally). `unit` says whether the figures are per minute (voice) or per message (sms). The channel-relevant lane fields (voice: `international`/`local`; sms: `person`/`application`) appear at the aggregate level and per provider; `breakdown` lists only publicly-displayable providers (cheapest avg first), with anonymous sources folded into the aggregate numbers only.'
@@ -511,6 +452,43 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProviderCost'
+    ProviderCost:
+      type: object
+      description: 'One named, publicly-displayable provider''s slice of the aggregate. Anonymous sources never appear here — they stay inside the channel-level numbers only. The lane fields present depend on the channel: a voice cost carries `international`/`local`, an SMS cost carries `person`/`application`; each is null when that provider''s decks do not split that way.'
+      properties:
+        name:
+          type: string
+          example: DIDWW
+        domain:
+          type:
+          - string
+          - 'null'
+          example: didww.com
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
+        international:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice: international lanes (default + origin-based).'
+        local:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'Voice: in-country lanes.'
+        person:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS: person-originated (P2P) decks.'
+        application:
+          allOf:
+          - $ref: '#/components/schemas/LaneUsd'
+          description: 'SMS: application-originated (A2P) decks.'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
@@ -526,6 +504,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

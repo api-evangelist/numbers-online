@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online MSP API
+  title: Numbers Online Phone Intelligence MSP API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged MSP across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -119,11 +117,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/tenants/{id}:
     get:
       tags:
@@ -274,11 +267,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/tenants/{id}/keys:
     post:
       tags:
@@ -378,11 +366,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/tenants/{id}/suppressions:
     get:
       tags:
@@ -590,56 +573,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   schemas:
-    Suppression:
-      type: object
-      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
-      properties:
-        label:
-          type:
-          - string
-          - 'null'
-          description: Your reference label for the entry.
-          example: front desk
-        created_at:
-          type: string
-          format: date-time
-    Error:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
-        error:
-          type: string
-          description: Human-readable error message (prose — switch on `code`, not on this string).
-        code:
-          type: string
-          enum:
-          - missing_key
-          - invalid_key
-          - use_case_forbidden
-          - rate_limited_key
-          - rate_limited_pool
-          - rate_limited_ip
-          - signature_invalid
-          - insufficient_balance
-          - account_suspended
-          - paid_verification_required
-          - receipt_invalid
-          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
-        retry_after_seconds:
-          type: integer
-          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
-      required:
-      - error
     Tenant:
       type: object
       description: A tenant (downstream customer/site) under an MSP account.
@@ -677,6 +612,61 @@ components:
         cached_or_enriched:
           type: integer
           description: Lookups served without a fresh dip ($0.002 each).
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    TenantSummary:
+      type: object
+      description: A tenant plus its sub-key count and trailing-30-day usage (list view).
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dental office
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+          example: active
+        created_at:
+          type: string
+          format: date-time
+        keys:
+          type: integer
+          description: Number of sub-keys issued to this tenant.
+          example: 2
+        usage_30d:
+          $ref: '#/components/schemas/TenantUsage'
     TenantKey:
       type: object
       description: A tenant sub-key (display fields only — never the raw key or its hash).
@@ -703,31 +693,19 @@ components:
           description: Lifetime request count for this sub-key.
         disabled:
           type: boolean
-    TenantSummary:
+    Suppression:
       type: object
-      description: A tenant plus its sub-key count and trailing-30-day usage (list view).
+      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: Dental office
-        status:
-          type: string
-          enum:
-          - active
-          - disabled
-          example: active
+        label:
+          type:
+          - string
+          - 'null'
+          description: Your reference label for the entry.
+          example: front desk
         created_at:
           type: string
           format: date-time
-        keys:
-          type: integer
-          description: Number of sub-keys issued to this tenant.
-          example: 2
-        usage_30d:
-          $ref: '#/components/schemas/TenantUsage'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
@@ -743,6 +721,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

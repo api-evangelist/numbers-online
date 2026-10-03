@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online Parsing API
+  title: Numbers Online Phone Intelligence Parsing API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged Parsing across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -71,11 +69,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/parse/batch:
     post:
       tags:
@@ -149,11 +142,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/parse:
     post:
       tags:
@@ -207,11 +195,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/parse/bulk:
     post:
       tags:
@@ -285,12 +268,19 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   schemas:
     ParsedPhoneNumber:
       type: object
@@ -431,18 +421,6 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-  responses:
-    RateLimited:
-      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
-      headers:
-        Retry-After:
-          description: Seconds to wait before retrying.
-          schema:
-            type: integer
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey
@@ -458,6 +436,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

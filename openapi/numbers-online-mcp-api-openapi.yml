@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online MCP API
+  title: Numbers Online Phone Intelligence MCP API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged MCP across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -63,11 +61,6 @@ paths:
           description: tools/call without a valid "mcp"-scoped key.
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   responses:
     RateLimited:
@@ -127,6 +120,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

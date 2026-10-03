@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online SBC / SIP API
+  title: Numbers Online Phone Intelligence SBC / SIP API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged SBC / SIP across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -112,11 +110,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/compliance/evidence:
     get:
       tags:
@@ -167,11 +160,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/signing:
     get:
       tags:
@@ -240,11 +228,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   schemas:
     RiskView:
@@ -375,62 +358,6 @@ components:
         as_of:
           type: string
           format: date-time
-    Error:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
-        error:
-          type: string
-          description: Human-readable error message (prose — switch on `code`, not on this string).
-        code:
-          type: string
-          enum:
-          - missing_key
-          - invalid_key
-          - use_case_forbidden
-          - rate_limited_key
-          - rate_limited_pool
-          - rate_limited_ip
-          - signature_invalid
-          - insufficient_balance
-          - account_suspended
-          - paid_verification_required
-          - receipt_invalid
-          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
-        retry_after_seconds:
-          type: integer
-          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
-      required:
-      - error
-    SigningInfo:
-      type: object
-      description: Operator HMAC request-signing state + secret for the calling key (Phase 4.3).
-      properties:
-        signing_required:
-          type: boolean
-        scheme:
-          type: string
-          example: hmac-sha256
-        max_skew_seconds:
-          type: integer
-          example: 300
-        canonical:
-          type: string
-          example: METHOD\nPATH\nsha256(body)hex\nX-Operator-Timestamp\nX-Operator-Nonce
-        headers:
-          type: array
-          items:
-            type: string
-        docs_url:
-          type: string
-        signing_secret:
-          type:
-          - string
-          - 'null'
-          description: The HKDF-derived HMAC secret for this key; null when signing is not configured on the deployment.
     EvidenceBundle:
       type: object
       description: A signed FCC robocall-mitigation evidence bundle (plan 4.5). PII-free (numbers only as hashes). A record of supplementary checks — NOT an FCC certification or compliance determination.
@@ -489,6 +416,62 @@ components:
           example: https://numbers.online/api/v1/publickey
         verify:
           type: string
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    SigningInfo:
+      type: object
+      description: Operator HMAC request-signing state + secret for the calling key (Phase 4.3).
+      properties:
+        signing_required:
+          type: boolean
+        scheme:
+          type: string
+          example: hmac-sha256
+        max_skew_seconds:
+          type: integer
+          example: 300
+        canonical:
+          type: string
+          example: METHOD\nPATH\nsha256(body)hex\nX-Operator-Timestamp\nX-Operator-Nonce
+        headers:
+          type: array
+          items:
+            type: string
+        docs_url:
+          type: string
+        signing_secret:
+          type:
+          - string
+          - 'null'
+          description: The HKDF-derived HMAC secret for this key; null when signing is not configured on the deployment.
     Receipt:
       type: object
       description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
@@ -588,6 +571,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

@@ -1,13 +1,11 @@
 openapi: 3.2.0
 info:
-  title: Numbers Online Account API
+  title: Numbers Online Phone Intelligence Account API
+  description: Phone number parsing, validation, and inbound caller-intelligence as a supplementary signal.
   version: 1.0.0
   contact:
     name: Phone Numbers Online
     url: https://numbers.online
-  x-refined-note:
-  - x-apievangelist-provenance differs across the merged source definitions and was not carried
-  description: 'Operations tagged Account across 2 of this provider''s published API definitions: numbers-online-openapi.json, numbers-online-openapi.yml. Each path carries the servers of the definition it was published in.'
 servers:
 - url: https://numbers.online
   description: Production server
@@ -123,11 +121,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account:
     get:
       tags:
@@ -266,11 +259,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/listings/{e164}:
     parameters:
     - name: e164
@@ -436,11 +424,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/listings/{e164}/verify-checkout:
     parameters:
     - name: e164
@@ -492,11 +475,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/listings/{e164}/logo:
     parameters:
     - name: e164
@@ -559,11 +537,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/listings/{e164}/documents:
     parameters:
     - name: e164
@@ -642,11 +615,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/listings/{e164}/reports:
     parameters:
     - name: e164
@@ -696,11 +664,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/topup:
     post:
       tags:
@@ -773,11 +736,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/keys:
     get:
       tags:
@@ -886,11 +844,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/keys/{id}:
     parameters:
     - name: id
@@ -981,11 +934,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/keys/{id}/rotate:
     post:
       tags:
@@ -1054,11 +1002,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/phones:
     get:
       tags:
@@ -1096,11 +1039,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/phones/{e164}:
     patch:
       tags:
@@ -1171,11 +1109,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/verify-phone/start:
     post:
       tags:
@@ -1245,11 +1178,6 @@ paths:
                 $ref: '#/components/schemas/Error'
         '429':
           $ref: '#/components/responses/RateLimited'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
   /api/v1/account/verify-phone/confirm:
     post:
       tags:
@@ -1332,31 +1260,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    servers:
-    - url: https://numbers.online
-      description: Production server
-    - url: http://localhost:3000
-      description: Development server
 components:
   schemas:
-    AccountPhone:
-      type: object
-      description: One verified number bound to the calling account, with its call-provenance enrollment state. These are the only fields the resource exposes — the platform's internal review/monitoring columns are operator-only by design.
-      properties:
-        e164:
-          type: string
-          example: '+442071838750'
-        verified_at:
-          type: string
-          format: date-time
-          description: When the OTP bind verified this number onto the account.
-        precall_enrolled:
-          type: boolean
-        precall_enrolled_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
     Account:
       type: object
       description: 'A self-service API account. Balances are in microdollars (1e-6 USD): $0.004 = 4,000, a $5 top-up = 5,000,000.'
@@ -1391,52 +1296,6 @@ components:
         created_at:
           type: string
           format: date-time
-    Error:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
-        error:
-          type: string
-          description: Human-readable error message (prose — switch on `code`, not on this string).
-        code:
-          type: string
-          enum:
-          - missing_key
-          - invalid_key
-          - use_case_forbidden
-          - rate_limited_key
-          - rate_limited_pool
-          - rate_limited_ip
-          - signature_invalid
-          - insufficient_balance
-          - account_suspended
-          - paid_verification_required
-          - receipt_invalid
-          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
-        retry_after_seconds:
-          type: integer
-          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
-      required:
-      - error
-    UsageSummary:
-      type: object
-      description: Aggregated usage over the trailing window (default 30 days).
-      properties:
-        requests:
-          type: integer
-          description: Total billed units in the window.
-          example: 1280
-        billed_micros:
-          type: integer
-          description: Total billed amount over the window, in microdollars.
-          example: 5120000
-        billed_usd:
-          type: string
-          description: Same billed amount as a 2-decimal USD string.
-          example: '5.12'
     ApiKeyView:
       type: object
       description: Display-only view of an API key (§4.4). Raw key material and hashes are never returned.
@@ -1488,6 +1347,70 @@ components:
         created_at:
           type: string
           format: date-time
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
+    AccountPhone:
+      type: object
+      description: One verified number bound to the calling account, with its call-provenance enrollment state. These are the only fields the resource exposes — the platform's internal review/monitoring columns are operator-only by design.
+      properties:
+        e164:
+          type: string
+          example: '+442071838750'
+        verified_at:
+          type: string
+          format: date-time
+          description: When the OTP bind verified this number onto the account.
+        precall_enrolled:
+          type: boolean
+        precall_enrolled_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+    UsageSummary:
+      type: object
+      description: Aggregated usage over the trailing window (default 30 days).
+      properties:
+        requests:
+          type: integer
+          description: Total billed units in the window.
+          example: 1280
+        billed_micros:
+          type: integer
+          description: Total billed amount over the window, in microdollars.
+          example: 5120000
+        billed_usd:
+          type: string
+          description: Same billed amount as a 2-decimal USD string.
+          example: '5.12'
   responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
@@ -1515,6 +1438,3 @@ components:
       in: query
       name: key
       description: API key in the `?key=` query param. Accepted by the header-less PBX endpoint GET /api/v1/cid/{number} and by the webhook adapters POST /api/v1/integrations/retell/inbound, POST /api/v1/integrations/vapi/tool, and POST /api/v1/sbc/redirect, whose upstream platforms set only a static webhook URL and cannot send an Authorization/X-API-Key header. The key can leak into access logs — use a dedicated, rotated key, and prefer header auth wherever the client supports it.
-x-refined-from:
-- numbers-online-openapi.json
-- numbers-online-openapi.yml

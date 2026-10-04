@@ -795,6 +795,8 @@ apis:
   humanURL: https://numbers.online/docs
   baseURL: https://numbers.online/api/v1/mcp
   tags:
+  - Webhook
+  tags_raw:
   - Webhooks
   properties:
   - type: OpenAPI
@@ -841,6 +843,9 @@ maintainers:
 - FN: APIs.json
   email: info@apis.io
 common:
+- type: CapabilityMap
+  url: capabilities/numbers-online-capability-edges.yml
+  name: Numbers Online Business Capability Map
 - type: Website
   url: https://numbers.online/
 - type: DomainSecurity

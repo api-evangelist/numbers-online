@@ -344,62 +344,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 components:
-  responses:
-    RateLimited:
-      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
-      headers:
-        Retry-After:
-          description: Seconds to wait before retrying.
-          schema:
-            type: integer
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
   schemas:
-    LaneUsd:
-      type: object
-      description: A min/avg/max spread for one pricing lane, as decimal USD strings.
-      properties:
-        min_usd:
-          type: string
-          example: '0.0072'
-        avg_usd:
-          type: string
-          example: '0.0146'
-        max_usd:
-          type: string
-          example: '0.32'
-    Error:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
-        error:
-          type: string
-          description: Human-readable error message (prose — switch on `code`, not on this string).
-        code:
-          type: string
-          enum:
-          - missing_key
-          - invalid_key
-          - use_case_forbidden
-          - rate_limited_key
-          - rate_limited_pool
-          - rate_limited_ip
-          - signature_invalid
-          - insufficient_balance
-          - account_suspended
-          - paid_verification_required
-          - receipt_invalid
-          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
-        retry_after_seconds:
-          type: integer
-          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
-      required:
-      - error
     ChannelCost:
       type: object
       description: 'Indicative RETAIL cost to reach a destination on ONE channel, aggregated across provider price-list decks. All amounts are decimal USD strings (money is integer micro-USD internally). `unit` says whether the figures are per minute (voice) or per message (sms). The channel-relevant lane fields (voice: `international`/`local`; sms: `person`/`application`) appear at the aggregate level and per provider; `breakdown` lists only publicly-displayable providers (cheapest avg first), with anonymous sources folded into the aggregate numbers only.'
@@ -452,6 +397,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProviderCost'
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
     ProviderCost:
       type: object
       description: 'One named, publicly-displayable provider''s slice of the aggregate. Anonymous sources never appear here — they stay inside the channel-level numbers only. The lane fields present depend on the channel: a voice cost carries `international`/`local`, an SMS cost carries `person`/`application`; each is null when that provider''s decks do not split that way.'
@@ -489,6 +464,31 @@ components:
           allOf:
           - $ref: '#/components/schemas/LaneUsd'
           description: 'SMS: application-originated (A2P) decks.'
+    LaneUsd:
+      type: object
+      description: A min/avg/max spread for one pricing lane, as decimal USD strings.
+      properties:
+        min_usd:
+          type: string
+          example: '0.0072'
+        avg_usd:
+          type: string
+          example: '0.0146'
+        max_usd:
+          type: string
+          example: '0.32'
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

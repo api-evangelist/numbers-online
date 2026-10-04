@@ -230,33 +230,162 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
-    RiskView:
+    Receipt:
       type: object
-      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
+      description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
       properties:
-        score:
-          type:
-          - integer
-          - 'null'
-          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
-        level:
+        receipt_id:
           type: string
-          enum:
-          - low
-          - medium
-          - high
-          - unknown
-          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
-        model:
+          example: nol_rec_8sd91kfh20aJ
+        schema_version:
+          type:
+          - string
+          - 'null'
+          example: '2026-06-03'
+        number_hash:
+          type: string
+          description: SHA-256 hex of the E.164 — the only number representation stored.
+        line_type:
+          type:
+          - string
+          - 'null'
+          example: mobile
+        dnc_status:
           type:
           - string
           - 'null'
           enum:
-          - first_party_plus_restricted_sources
-          - first_party_plus_external
-          - dial_structural
-          - null
-          description: Which scoring pipeline produced the score; null when score is null.
+          - not_listed
+          - listed
+          - unknown
+          description: Supplementary do-not-call signal; "unknown" until a data partner is configured.
+        reassigned_status:
+          type:
+          - string
+          - 'null'
+          enum:
+          - 'no'
+          - 'yes'
+          - unknown
+        context:
+          type:
+          - string
+          - 'null'
+          example: mcp:dnc_check
+        checked_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
+          description: The "as of T" the receipt cryptographically binds.
+        created_at:
+          type: string
+          format: date-time
+        signed_payload:
+          type:
+          - string
+          - 'null'
+          description: The exact canonical JSON that was signed (commits to number_hash).
+        response_signature:
+          type:
+          - string
+          - 'null'
+          description: '''ed25519:<base64>'', or ''unsigned''.'
+        verification:
+          type: object
+          properties:
+            algorithm:
+              type: string
+              example: ed25519
+            public_key_url:
+              type: string
+              example: https://numbers.online/api/v1/publickey
+            instructions:
+              type: string
+    SigningInfo:
+      type: object
+      description: Operator HMAC request-signing state + secret for the calling key (Phase 4.3).
+      properties:
+        signing_required:
+          type: boolean
+        scheme:
+          type: string
+          example: hmac-sha256
+        max_skew_seconds:
+          type: integer
+          example: 300
+        canonical:
+          type: string
+          example: METHOD\nPATH\nsha256(body)hex\nX-Operator-Timestamp\nX-Operator-Nonce
+        headers:
+          type: array
+          items:
+            type: string
+        docs_url:
+          type: string
+        signing_secret:
+          type:
+          - string
+          - 'null'
+          description: The HKDF-derived HMAC secret for this key; null when signing is not configured on the deployment.
+    EvidenceBundle:
+      type: object
+      description: A signed FCC robocall-mitigation evidence bundle (plan 4.5). PII-free (numbers only as hashes). A record of supplementary checks — NOT an FCC certification or compliance determination.
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-06'
+        bundle_id:
+          type: string
+          example: nol_bundle_…
+        operator:
+          type: object
+          properties:
+            account_id:
+              type:
+              - string
+              - 'null'
+            key_prefix:
+              type:
+              - string
+              - 'null'
+        window:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+        generated_at:
+          type: string
+          format: date-time
+        totals:
+          type: object
+          description: 'Aggregate counts: checks, distinct_numbers, by_dnc, by_reassigned, by_context.'
+        merkle_root:
+          type:
+          - string
+          - 'null'
+          description: SHA-256 Merkle root over the receipt leaves; null when the window held no receipts.
+        receipts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Receipt'
+        disclaimer:
+          type: string
+        response_signature:
+          type: string
+          description: '''ed25519:<base64>'' over the canonical bundle, or ''unsigned''.'
+        truncated:
+          type: boolean
+          description: True when the window held more than the per-bundle receipt cap (disclosed, never silent).
+        public_key_url:
+          type: string
+          example: https://numbers.online/api/v1/publickey
+        verify:
+          type: string
     SbcRedirectResponse:
       type: object
       description: Supplementary SBC/SIP redirect decision (plan 4.2). Same shape for known/unknown/valid/invalid numbers (anti-enumeration). Every field is a low-confidence supplementary signal — the SBC keeps the routing decision; Numbers Online never asserts a call is lawful, unlawful, safe, or spam.
@@ -358,64 +487,6 @@ components:
         as_of:
           type: string
           format: date-time
-    EvidenceBundle:
-      type: object
-      description: A signed FCC robocall-mitigation evidence bundle (plan 4.5). PII-free (numbers only as hashes). A record of supplementary checks — NOT an FCC certification or compliance determination.
-      properties:
-        schema_version:
-          type: string
-          example: '2026-06-06'
-        bundle_id:
-          type: string
-          example: nol_bundle_…
-        operator:
-          type: object
-          properties:
-            account_id:
-              type:
-              - string
-              - 'null'
-            key_prefix:
-              type:
-              - string
-              - 'null'
-        window:
-          type: object
-          properties:
-            from:
-              type: string
-              format: date-time
-            to:
-              type: string
-              format: date-time
-        generated_at:
-          type: string
-          format: date-time
-        totals:
-          type: object
-          description: 'Aggregate counts: checks, distinct_numbers, by_dnc, by_reassigned, by_context.'
-        merkle_root:
-          type:
-          - string
-          - 'null'
-          description: SHA-256 Merkle root over the receipt leaves; null when the window held no receipts.
-        receipts:
-          type: array
-          items:
-            $ref: '#/components/schemas/Receipt'
-        disclaimer:
-          type: string
-        response_signature:
-          type: string
-          description: '''ed25519:<base64>'' over the canonical bundle, or ''unsigned''.'
-        truncated:
-          type: boolean
-          description: True when the window held more than the per-bundle receipt cap (disclosed, never silent).
-        public_key_url:
-          type: string
-          example: https://numbers.online/api/v1/publickey
-        verify:
-          type: string
     Error:
       type: object
       properties:
@@ -446,104 +517,33 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-    SigningInfo:
+    RiskView:
       type: object
-      description: Operator HMAC request-signing state + secret for the calling key (Phase 4.3).
+      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
       properties:
-        signing_required:
-          type: boolean
-        scheme:
-          type: string
-          example: hmac-sha256
-        max_skew_seconds:
-          type: integer
-          example: 300
-        canonical:
-          type: string
-          example: METHOD\nPATH\nsha256(body)hex\nX-Operator-Timestamp\nX-Operator-Nonce
-        headers:
-          type: array
-          items:
-            type: string
-        docs_url:
-          type: string
-        signing_secret:
+        score:
           type:
-          - string
+          - integer
           - 'null'
-          description: The HKDF-derived HMAC secret for this key; null when signing is not configured on the deployment.
-    Receipt:
-      type: object
-      description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
-      properties:
-        receipt_id:
+          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
+        level:
           type: string
-          example: nol_rec_8sd91kfh20aJ
-        schema_version:
-          type:
-          - string
-          - 'null'
-          example: '2026-06-03'
-        number_hash:
-          type: string
-          description: SHA-256 hex of the E.164 — the only number representation stored.
-        line_type:
-          type:
-          - string
-          - 'null'
-          example: mobile
-        dnc_status:
+          enum:
+          - low
+          - medium
+          - high
+          - unknown
+          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
+        model:
           type:
           - string
           - 'null'
           enum:
-          - not_listed
-          - listed
-          - unknown
-          description: Supplementary do-not-call signal; "unknown" until a data partner is configured.
-        reassigned_status:
-          type:
-          - string
-          - 'null'
-          enum:
-          - 'no'
-          - 'yes'
-          - unknown
-        context:
-          type:
-          - string
-          - 'null'
-          example: mcp:dnc_check
-        checked_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-          description: The "as of T" the receipt cryptographically binds.
-        created_at:
-          type: string
-          format: date-time
-        signed_payload:
-          type:
-          - string
-          - 'null'
-          description: The exact canonical JSON that was signed (commits to number_hash).
-        response_signature:
-          type:
-          - string
-          - 'null'
-          description: '''ed25519:<base64>'', or ''unsigned''.'
-        verification:
-          type: object
-          properties:
-            algorithm:
-              type: string
-              example: ed25519
-            public_key_url:
-              type: string
-              example: https://numbers.online/api/v1/publickey
-            instructions:
-              type: string
+          - first_party_plus_restricted_sources
+          - first_party_plus_external
+          - dial_structural
+          - null
+          description: Which scoring pipeline produced the score; null when score is null.
   responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.

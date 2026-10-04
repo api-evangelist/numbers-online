@@ -69,6 +69,36 @@ paths:
                     example: '-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n'
 components:
   schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
+        error:
+          type: string
+          description: Human-readable error message (prose — switch on `code`, not on this string).
+        code:
+          type: string
+          enum:
+          - missing_key
+          - invalid_key
+          - use_case_forbidden
+          - rate_limited_key
+          - rate_limited_pool
+          - rate_limited_ip
+          - signature_invalid
+          - insufficient_balance
+          - account_suspended
+          - paid_verification_required
+          - receipt_invalid
+          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
+        retry_after_seconds:
+          type: integer
+          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
+      required:
+      - error
     Receipt:
       type: object
       description: A signed lookup receipt (plan 3.3). No raw phone number is stored — only number_hash = sha256(E.164). Verify response_signature over the exact signed_payload bytes with the Ed25519 public key (GET /api/v1/publickey), then recompute sha256(your E.164) and match number_hash to bind the receipt to a number. Because a phone number is a small keyspace, number_hash is recomputable from a candidate number — treat the receipt id as bound to a specific number, not as anonymized, and share it only with parties entitled to know that number. A supplementary signal, not a compliance assertion.
@@ -141,36 +171,6 @@ components:
               example: https://numbers.online/api/v1/publickey
             instructions:
               type: string
-    Error:
-      type: object
-      properties:
-        success:
-          type: boolean
-          example: false
-          description: Legacy field emitted ONLY by the pre-v1 parse family (/api/parse, /api/parse/bulk, /api/countries). /v1 routes return only `error` — do not depend on `success` there.
-        error:
-          type: string
-          description: Human-readable error message (prose — switch on `code`, not on this string).
-        code:
-          type: string
-          enum:
-          - missing_key
-          - invalid_key
-          - use_case_forbidden
-          - rate_limited_key
-          - rate_limited_pool
-          - rate_limited_ip
-          - signature_invalid
-          - insufficient_balance
-          - account_suspended
-          - paid_verification_required
-          - receipt_invalid
-          description: 'Stable machine-readable error code (added 2026-06-12, additive — older errors may omit it). See the "Error codes" section in the API description for the full table. A valid key on the wrong use case returns 403 use_case_forbidden (not 401): re-authing will not fix a permissions problem.'
-        retry_after_seconds:
-          type: integer
-          description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
-      required:
-      - error
   responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.

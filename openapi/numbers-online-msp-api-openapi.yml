@@ -575,22 +575,16 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
-    Tenant:
+    Suppression:
       type: object
-      description: A tenant (downstream customer/site) under an MSP account.
+      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
       properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: Dental office
-        status:
-          type: string
-          enum:
-          - active
-          - disabled
-          example: active
+        label:
+          type:
+          - string
+          - 'null'
+          description: Your reference label for the entry.
+          example: front desk
         created_at:
           type: string
           format: date-time
@@ -612,6 +606,51 @@ components:
         cached_or_enriched:
           type: integer
           description: Lookups served without a fresh dip ($0.002 each).
+    TenantKey:
+      type: object
+      description: A tenant sub-key (display fields only — never the raw key or its hash).
+      properties:
+        id:
+          type: string
+          format: uuid
+        key_prefix:
+          type: string
+          example: nol_8f3c2a1b
+        name:
+          type: string
+        tier:
+          type: string
+          enum:
+          - free
+          - standard
+          - enterprise
+        rate_limit:
+          type: integer
+          description: Requests per 60-second window.
+        requests_total:
+          type: integer
+          description: Lifetime request count for this sub-key.
+        disabled:
+          type: boolean
+    Tenant:
+      type: object
+      description: A tenant (downstream customer/site) under an MSP account.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dental office
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+          example: active
+        created_at:
+          type: string
+          format: date-time
     Error:
       type: object
       properties:
@@ -667,45 +706,6 @@ components:
           example: 2
         usage_30d:
           $ref: '#/components/schemas/TenantUsage'
-    TenantKey:
-      type: object
-      description: A tenant sub-key (display fields only — never the raw key or its hash).
-      properties:
-        id:
-          type: string
-          format: uuid
-        key_prefix:
-          type: string
-          example: nol_8f3c2a1b
-        name:
-          type: string
-        tier:
-          type: string
-          enum:
-          - free
-          - standard
-          - enterprise
-        rate_limit:
-          type: integer
-          description: Requests per 60-second window.
-        requests_total:
-          type: integer
-          description: Lifetime request count for this sub-key.
-        disabled:
-          type: boolean
-    Suppression:
-      type: object
-      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
-      properties:
-        label:
-          type:
-          - string
-          - 'null'
-          description: Your reference label for the entry.
-          example: front desk
-        created_at:
-          type: string
-          format: date-time
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

@@ -263,68 +263,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 components:
+  responses:
+    RateLimited:
+      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying.
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InsufficientBalance:
+      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InsufficientBalance'
   schemas:
-    RiskView:
-      type: object
-      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
-      properties:
-        score:
-          type:
-          - integer
-          - 'null'
-          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
-        level:
-          type: string
-          enum:
-          - low
-          - medium
-          - high
-          - unknown
-          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
-        model:
-          type:
-          - string
-          - 'null'
-          enum:
-          - first_party_plus_restricted_sources
-          - first_party_plus_external
-          - dial_structural
-          - null
-          description: Which scoring pipeline produced the score; null when score is null.
-    LookupBatchResponse:
-      type: object
-      description: 'Bulk lookup result: one entry per submitted number (input order) plus a billing summary.'
-      properties:
-        schema_version:
-          type: string
-          example: '2026-06-12'
-          description: Version of the batch ENVELOPE (results/summary wrapper); each per-number result carries its own schema_version.
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/LookupResponse'
-          description: Per-number lookup results, in the order the numbers were submitted.
-        summary:
-          type: object
-          properties:
-            total:
-              type: integer
-              description: Numbers submitted.
-            valid:
-              type: integer
-              description: Numbers that parsed as valid (includes tenant-suppressed numbers, which are valid but not billed).
-            invalid:
-              type: integer
-              description: Numbers that were invalid (not billed).
-            suppressed:
-              type: integer
-              description: 'Valid numbers on the calling tenant''s suppression list: returned with deterministic fields only (no enrichment) and not billed.'
-            billed_fresh_cnam:
-              type: integer
-              description: Valid numbers billed at $0.004 (fresh wholesale CNAM dip).
-            billed_enriched:
-              type: integer
-              description: Valid numbers billed at $0.002 (cache hit or no CNAM supplier).
     LookupResponse:
       type: object
       description: 'Uniform number-lookup result. The same shape is returned for valid, invalid, known, and unknown numbers (anti-enumeration). Invalid input yields `valid: false` with the deterministic fields (`e164`, `formatted`, `line_type`, `carrier`, `country`) null, `verstat` `unknown`, `confidence` `low`, and `spam_score` null. Enrichment fields (`cnam`, `spam_score`) are fail-open — they null out on a supplier/scoring error rather than failing the request.'
@@ -431,6 +388,40 @@ components:
           type: string
           format: date-time
           description: Timestamp the lookup was assembled.
+    LookupBatchResponse:
+      type: object
+      description: 'Bulk lookup result: one entry per submitted number (input order) plus a billing summary.'
+      properties:
+        schema_version:
+          type: string
+          example: '2026-06-12'
+          description: Version of the batch ENVELOPE (results/summary wrapper); each per-number result carries its own schema_version.
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LookupResponse'
+          description: Per-number lookup results, in the order the numbers were submitted.
+        summary:
+          type: object
+          properties:
+            total:
+              type: integer
+              description: Numbers submitted.
+            valid:
+              type: integer
+              description: Numbers that parsed as valid (includes tenant-suppressed numbers, which are valid but not billed).
+            invalid:
+              type: integer
+              description: Numbers that were invalid (not billed).
+            suppressed:
+              type: integer
+              description: 'Valid numbers on the calling tenant''s suppression list: returned with deterministic fields only (no enrichment) and not billed.'
+            billed_fresh_cnam:
+              type: integer
+              description: Valid numbers billed at $0.004 (fresh wholesale CNAM dip).
+            billed_enriched:
+              type: integer
+              description: Valid numbers billed at $0.002 (cache hit or no CNAM supplier).
     Error:
       type: object
       properties:
@@ -491,24 +482,33 @@ components:
           type: integer
           example: 500
           description: Minimum top-up amount in cents.
-  responses:
-    RateLimited:
-      description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
-      headers:
-        Retry-After:
-          description: Seconds to wait before retrying.
-          schema:
-            type: integer
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    InsufficientBalance:
-      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/InsufficientBalance'
+    RiskView:
+      type: object
+      description: 'One risk vocabulary (added 2026-06-11, additive — no schema_version bumps): the same numeric signal as the surface''s legacy field, plus a band and the MODEL label that says which pipeline scored it. The legacy fields (`spam_score`, `risk_score`/`risk_level`) are frozen forever; this object is the disclosed, consistent read. A null score yields the uniform unknown shape ({score:null, level:"unknown", model:null}) on every branch (anti-enumeration; fail-open nulls are load-bearing). The numeric scales are deliberately NOT unified across models — `model` is what tells them apart. See "Risk models" in the spec intro.'
+      properties:
+        score:
+          type:
+          - integer
+          - 'null'
+          description: The risk score on the MODEL's own scale (1–99 for first_party_plus_restricted_sources; 0–100 for the others); null when no signal.
+        level:
+          type: string
+          enum:
+          - low
+          - medium
+          - high
+          - unknown
+          description: 'Shared banding: <40 low, <70 medium, ≥70 high; unknown when score is null. NOTE: the SBC default flag threshold is a separate policy knob (80) — level high does not automatically flag.'
+        model:
+          type:
+          - string
+          - 'null'
+          enum:
+          - first_party_plus_restricted_sources
+          - first_party_plus_external
+          - dial_structural
+          - null
+          description: Which scoring pipeline produced the score; null when score is null.
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

@@ -1262,40 +1262,22 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
-    Account:
+    UsageSummary:
       type: object
-      description: 'A self-service API account. Balances are in microdollars (1e-6 USD): $0.004 = 4,000, a $5 top-up = 5,000,000.'
+      description: Aggregated usage over the trailing window (default 30 days).
       properties:
-        id:
-          type: string
-          format: uuid
-        email:
-          type:
-          - string
-          - 'null'
-          format: email
-          description: Optional renewal-reminder email (may be null).
-        name:
-          type:
-          - string
-          - 'null'
-        balance_micros:
+        requests:
           type: integer
-          description: Remaining prepaid credit in microdollars.
-          example: 5000000
-        balance_usd:
+          description: Total billed units in the window.
+          example: 1280
+        billed_micros:
+          type: integer
+          description: Total billed amount over the window, in microdollars.
+          example: 5120000
+        billed_usd:
           type: string
-          description: Same balance as a 2-decimal USD string.
-          example: '5.00'
-        status:
-          type: string
-          enum:
-          - active
-          - suspended
-          example: active
-        created_at:
-          type: string
-          format: date-time
+          description: Same billed amount as a 2-decimal USD string.
+          example: '5.12'
     ApiKeyView:
       type: object
       description: Display-only view of an API key (§4.4). Raw key material and hashes are never returned.
@@ -1347,6 +1329,58 @@ components:
         created_at:
           type: string
           format: date-time
+    Account:
+      type: object
+      description: 'A self-service API account. Balances are in microdollars (1e-6 USD): $0.004 = 4,000, a $5 top-up = 5,000,000.'
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type:
+          - string
+          - 'null'
+          format: email
+          description: Optional renewal-reminder email (may be null).
+        name:
+          type:
+          - string
+          - 'null'
+        balance_micros:
+          type: integer
+          description: Remaining prepaid credit in microdollars.
+          example: 5000000
+        balance_usd:
+          type: string
+          description: Same balance as a 2-decimal USD string.
+          example: '5.00'
+        status:
+          type: string
+          enum:
+          - active
+          - suspended
+          example: active
+        created_at:
+          type: string
+          format: date-time
+    AccountPhone:
+      type: object
+      description: One verified number bound to the calling account, with its call-provenance enrollment state. These are the only fields the resource exposes — the platform's internal review/monitoring columns are operator-only by design.
+      properties:
+        e164:
+          type: string
+          example: '+442071838750'
+        verified_at:
+          type: string
+          format: date-time
+          description: When the OTP bind verified this number onto the account.
+        precall_enrolled:
+          type: boolean
+        precall_enrolled_at:
+          type:
+          - string
+          - 'null'
+          format: date-time
     Error:
       type: object
       properties:
@@ -1377,40 +1411,6 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-    AccountPhone:
-      type: object
-      description: One verified number bound to the calling account, with its call-provenance enrollment state. These are the only fields the resource exposes — the platform's internal review/monitoring columns are operator-only by design.
-      properties:
-        e164:
-          type: string
-          example: '+442071838750'
-        verified_at:
-          type: string
-          format: date-time
-          description: When the OTP bind verified this number onto the account.
-        precall_enrolled:
-          type: boolean
-        precall_enrolled_at:
-          type:
-          - string
-          - 'null'
-          format: date-time
-    UsageSummary:
-      type: object
-      description: Aggregated usage over the trailing window (default 30 days).
-      properties:
-        requests:
-          type: integer
-          description: Total billed units in the window.
-          example: 1280
-        billed_micros:
-          type: integer
-          description: Total billed amount over the window, in microdollars.
-          example: 5120000
-        billed_usd:
-          type: string
-          description: Same billed amount as a 2-decimal USD string.
-          example: '5.12'
   responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.

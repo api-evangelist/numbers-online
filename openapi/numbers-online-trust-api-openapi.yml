@@ -222,36 +222,6 @@ paths:
           $ref: '#/components/responses/RateLimited'
 components:
   schemas:
-    InsufficientBalance:
-      type: object
-      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
-      properties:
-        error:
-          type: string
-          example: Insufficient prepaid balance for this request.
-        code:
-          type: string
-          enum:
-          - insufficient_balance
-          description: Stable machine-readable code (added 2026-06-12).
-        balance_micros:
-          type:
-          - integer
-          - 'null'
-          description: Remaining balance in microdollars (may be 0 or null).
-          example: 0
-        topup:
-          type: string
-          description: How to add credit (prose; prefer the structured siblings).
-          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
-        topup_url:
-          type: string
-          example: /api/v1/account/topup
-          description: Top-up endpoint path.
-        topup_min_cents:
-          type: integer
-          example: 500
-          description: Minimum top-up amount in cents.
     Error:
       type: object
       properties:
@@ -282,13 +252,37 @@ components:
           description: 'Present on 429s: seconds until the window resets (mirrors the Retry-After header).'
       required:
       - error
-  responses:
     InsufficientBalance:
-      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/InsufficientBalance'
+      type: object
+      description: 402 body returned when a standard-tier account has no remaining credit for a billed request. A SUSPENDED account instead returns 403 with code `account_suspended` and no top-up pointer (payment does not lift a suspension).
+      properties:
+        error:
+          type: string
+          example: Insufficient prepaid balance for this request.
+        code:
+          type: string
+          enum:
+          - insufficient_balance
+          description: Stable machine-readable code (added 2026-06-12).
+        balance_micros:
+          type:
+          - integer
+          - 'null'
+          description: Remaining balance in microdollars (may be 0 or null).
+          example: 0
+        topup:
+          type: string
+          description: How to add credit (prose; prefer the structured siblings).
+          example: 'POST /api/v1/account/topup with {"amount_cents": 500} (minimum $5) to add credit.'
+        topup_url:
+          type: string
+          example: /api/v1/account/topup
+          description: Top-up endpoint path.
+        topup_min_cents:
+          type: integer
+          example: 500
+          description: Minimum top-up amount in cents.
+  responses:
     RateLimited:
       description: Per-key rate limit exceeded. Retry after the number of seconds in the Retry-After header.
       headers:
@@ -300,6 +294,12 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
+    InsufficientBalance:
+      description: Standard-tier prepaid balance is exhausted. Top up (POST /api/v1/account/topup) to resume.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InsufficientBalance'
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

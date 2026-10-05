@@ -1,0 +1,38 @@
+slug: numbers-online
+provider: Numbers Online
+generated_by: planning/capability-mapping/scripts/classify_capabilities.py
+model: claude-opus-5
+frame:
+- Software & Technology
+min_confidence: 0.7
+capability_model:
+  source: https://github.com/vincentmakes/turbo-ea-capabilities
+  license: CC-BY-4.0
+  attribution: Turbo EA Capabilities by Vincent Verdet — Turbo EA, https://github.com/vincentmakes/turbo-ea-capabilities,
+    CC BY 4.0
+  notice: NOTICE
+edge_count: 2
+edges:
+- tag: MSP
+  spec_file: numbers-online-msp-api-openapi.yml
+  capability_id: BC-4230.10
+  capability_id_l1: BC-4230
+  capability_name: Tenant Provisioning & Lifecycle
+  confidence: 0.85
+  evidence: GET /api/v1/account/tenants  listTenants; POST /api/v1/account/tenants  createTenant; PATCH
+    /api/v1/account/tenants/{id}  setTenantStatus; POST /api/v1/account/tenants/{id}/keys  issueTenantKey
+  reason: Operations create, list, status-change and key-issue tenants under a reseller/MSP account, with
+    Tenant, TenantSummary, TenantUsage and TenantKey schemas — this is multi-tenant provisioning and lifecycle.
+    Per-tenant suppressions edge toward tenant configuration, hence not full confidence on the L2.
+- tag: Account
+  spec_file: numbers-online-account-api-openapi.yml
+  capability_id: BC-4270.40
+  capability_id_l1: BC-4270
+  capability_name: Developer Identity & Credential Management
+  confidence: 0.7
+  evidence: POST /api/v1/account/signup 'Sign up for an API key'; POST /api/v1/account/keys createAccountKey
+    'Mint a new API key'; GET /api/v1/account 'Get account balance and usage'
+  reason: The surface is developer self-service onboarding and API-key issuance for the vendor's B2B phone-intelligence
+    API, plus usage/credit visibility — i.e. developer identity and credential management on a developer
+    platform. Some operations (topup, listing verification) sit outside this sub-capability, hence moderate
+    confidence.

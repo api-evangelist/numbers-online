@@ -109,3 +109,44 @@ plans:
   billing_period: null
   description: Custom caller-intelligence lookups, custom report quota, custom billing — contact the provider.
   contact: https://numbers.online/concierge
+x-canonical:
+  generated: '2026-10-08'
+  vocabulary: all/0-working/economics/plans-canonical.yml
+  models:
+  - free
+  - metered
+  - negotiated
+  - one-time
+  - subscription
+  units: []
+  plans:
+  - name: Free API tier (Public lookup)
+    access: free
+    model: free
+    model_how: derived
+    units: []
+    periods: []
+  - name: Personal · Verified
+    access: other
+    model: one-time
+    model_how: stated
+    units: []
+    periods: []
+  - name: Business · Verified
+    access: other
+    model: subscription
+    model_how: stated
+    units: []
+    periods: []
+  - name: Standard (prepaid)
+    access: other
+    model: metered
+    model_how: stated
+    units: []
+    periods: []
+  - name: Enterprise
+    access: negotiated
+    model: negotiated
+    model_how: stated
+    units: []
+    periods: []

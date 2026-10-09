@@ -1,4 +1,4 @@
-generated: '2026-09-19'
+generated: '2026-09-23'
 method: generated
 source: openapi/numbers-online-openapi.yml
 description: Recommended x-agentic-access execution contracts, classified heuristically from
@@ -7,11 +7,11 @@ description: Recommended x-agentic-access execution contracts, classified heuris
 summary:
   operations: 56
   by_action_class:
-    acting: 36
-    connected: 20
+    acting: 35
+    connected: 21
   by_consequence:
-    write: 31
-    read: 20
+    write: 30
+    read: 21
     physical: 2
     safety-critical: 3
   human_in_the_loop_required: 3
@@ -88,18 +88,12 @@ operations:
   method: post
   operationId: lookupNumberBatch
   x-agentic-access:
-    action-class: acting
-    consequence: write
-    subject: required
-    audience: null
+    action-class: connected
+    consequence: read
+    subject: optional
     token:
-      max-ttl: 900
-    escalation:
-      human-in-the-loop: conditional
-      triggers:
-      - abnormal
-      - high-value
-    audit: required
+      max-ttl: 3600
+    audit: none
 - path: /api/v1/lookup/changes
   method: get
   operationId: lookupChanges

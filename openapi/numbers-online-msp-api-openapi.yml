@@ -575,82 +575,6 @@ paths:
                 $ref: '#/components/schemas/Error'
 components:
   schemas:
-    Suppression:
-      type: object
-      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
-      properties:
-        label:
-          type:
-          - string
-          - 'null'
-          description: Your reference label for the entry.
-          example: front desk
-        created_at:
-          type: string
-          format: date-time
-    TenantUsage:
-      type: object
-      description: A tenant's aggregated usage over the trailing 30 days.
-      properties:
-        requests:
-          type: integer
-          description: Total billed units in the window.
-          example: 420
-        billed_micros:
-          type: integer
-          description: Total billed amount over the window, in microdollars.
-          example: 1680000
-        fresh_cnam_dips:
-          type: integer
-          description: Lookups that performed a fresh wholesale CNAM dip ($0.004 each).
-        cached_or_enriched:
-          type: integer
-          description: Lookups served without a fresh dip ($0.002 each).
-    TenantKey:
-      type: object
-      description: A tenant sub-key (display fields only — never the raw key or its hash).
-      properties:
-        id:
-          type: string
-          format: uuid
-        key_prefix:
-          type: string
-          example: nol_8f3c2a1b
-        name:
-          type: string
-        tier:
-          type: string
-          enum:
-          - free
-          - standard
-          - enterprise
-        rate_limit:
-          type: integer
-          description: Requests per 60-second window.
-        requests_total:
-          type: integer
-          description: Lifetime request count for this sub-key.
-        disabled:
-          type: boolean
-    Tenant:
-      type: object
-      description: A tenant (downstream customer/site) under an MSP account.
-      properties:
-        id:
-          type: string
-          format: uuid
-        name:
-          type: string
-          example: Dental office
-        status:
-          type: string
-          enum:
-          - active
-          - disabled
-          example: active
-        created_at:
-          type: string
-          format: date-time
     Error:
       type: object
       properties:
@@ -706,6 +630,82 @@ components:
           example: 2
         usage_30d:
           $ref: '#/components/schemas/TenantUsage'
+    TenantUsage:
+      type: object
+      description: A tenant's aggregated usage over the trailing 30 days.
+      properties:
+        requests:
+          type: integer
+          description: Total billed units in the window.
+          example: 420
+        billed_micros:
+          type: integer
+          description: Total billed amount over the window, in microdollars.
+          example: 1680000
+        fresh_cnam_dips:
+          type: integer
+          description: Lookups that performed a fresh wholesale CNAM dip ($0.004 each).
+        cached_or_enriched:
+          type: integer
+          description: Lookups served without a fresh dip ($0.002 each).
+    Tenant:
+      type: object
+      description: A tenant (downstream customer/site) under an MSP account.
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Dental office
+        status:
+          type: string
+          enum:
+          - active
+          - disabled
+          example: active
+        created_at:
+          type: string
+          format: date-time
+    Suppression:
+      type: object
+      description: A suppression-list entry. The suppressed number is stored only as a SHA-256 hash and is never returned — only its label and timestamp.
+      properties:
+        label:
+          type:
+          - string
+          - 'null'
+          description: Your reference label for the entry.
+          example: front desk
+        created_at:
+          type: string
+          format: date-time
+    TenantKey:
+      type: object
+      description: A tenant sub-key (display fields only — never the raw key or its hash).
+      properties:
+        id:
+          type: string
+          format: uuid
+        key_prefix:
+          type: string
+          example: nol_8f3c2a1b
+        name:
+          type: string
+        tier:
+          type: string
+          enum:
+          - free
+          - standard
+          - enterprise
+        rate_limit:
+          type: integer
+          description: Requests per 60-second window.
+        requests_total:
+          type: integer
+          description: Lifetime request count for this sub-key.
+        disabled:
+          type: boolean
   securitySchemes:
     ApiKeyAuth:
       type: apiKey

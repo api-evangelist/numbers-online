@@ -64,26 +64,142 @@
 > Full detail: **[Where this data comes from](https://apievangelist.com/about/where-our-data-comes-from)**
 <!-- API-EVANGELIST-PROVENANCE:END -->
 
-Numbers Online is a phone-number trust and intelligence service operated by Evergrow Management Pte. Ltd. (Singapore). It runs a free public reverse phone lookup with a community-driven, advisory spam-risk score, paid number verification for people and businesses, and a B2B API keyed on a single E.164 primitive: parsing and validation, single and batch lookup (line type, range carrier, CNAM, STIR/SHAKEN verstat and a low-confidence spam signal), signed inbound caller intelligence with Ed25519 receipts, an outbound pre-call do-not-contact scrub with call-provenance enrollment, consent-first list scrubbing, a ClearIP-compatible SBC/SIP redirect decision, a multi-tenant MSP control plane, and a hosted read-only MCP server plus Vapi/Retell webhooks for AI voice agents.
+Numbers Online is a phone-number trust and intelligence service operated by Evergrow Management Pte. Ltd. of Singapore. It runs a free public reverse phone lookup with a community-driven, advisory spam-risk score, paid number verification for people and businesses, and a B2B API keyed on a single E.164 primitive: parsing and validation, single and batch lookup (line type, range carrier, CNAM, STIR/SHAKEN verstat and a low-confidence spam signal), signed inbound caller intelligence with Ed25519 receipts, an outbound pre-call do-not-contact scrub and call-provenance enrollment, consent-first list scrubbing, a ClearIP-compatible SBC/SIP redirect decision, a multi-tenant MSP control plane, and a hosted read-only MCP server plus Vapi/Retell webhooks for AI voice agents. The 56-operation REST API is published as an OpenAPI 3.0.3 contract at /api/spec, with an llms.txt, an A2A agent card at /.well-known/agent-card.json, markdown mirrors of the docs, and a self-service free tier with no card.
 
-- Website: https://numbers.online/
-- Developers: https://numbers.online/developers · API reference: https://numbers.online/docs · Pricing: https://numbers.online/pricing
-- OpenAPI 3.0.3 (56 operations, provider-hosted source of truth): https://numbers.online/api/spec — harvested verbatim to `openapi/`
-- llms.txt: https://numbers.online/llms.txt · A2A agent card: https://numbers.online/.well-known/agent-card.json · MCP server: `POST https://numbers.online/api/v1/mcp`
-- GitHub: https://github.com/numbers-online
+**Areas:** Phone Intelligence · Caller ID · CNAM · Reverse Phone Lookup · Spam Detection · Do Not Call · Telephony · STIR/SHAKEN · MCP · Agent-Native · Compliance · Company
 
-## What this profile holds (enrichment pass 2026-09-19)
+## Numbers Online on APIs.io
 
-| Artifact | Method | Notes |
-|---|---|---|
-| `openapi/` | searched | verbatim JSON original + YAML serialization |
-| `a2a/` | probed | agent card graded **conformant**; endpoint answers 405/401 as declared |
-| `mcp/` | probed | live `tools/list` (4 tools) + `initialize`; crosswalk to REST operationIds; official MCP registry listing |
-| `well-known/` | probed | closed path list on apex + www with a negative control; only the agent card is served |
-| `llms/` | searched | verbatim |
-| `authentication/`, `agentic-access/`, `security/` | derived / generated / probed | pipeline scripts |
-| `conventions/`, `errors/`, `lifecycle/`, `rate-limits/`, `plans/`, `changelog/`, `conformance/` | searched | from the spec description, docs, pricing and terms |
-| `regulatory/` | searched | DSR process and report notice-and-action recorded; everything else checked and absent |
-| `skills/`, `data-model/`, `overlays/`, `packages/` | generated / derived / searched | no SDKs exist on any registry — recorded honestly |
+Everything profiled for Numbers Online is published on APIs.io rather than in this repository. Start at the provider page — **[apis.io/providers/numbers-online/](https://apis.io/providers/numbers-online/)** — or go straight to one of the APIs or properties below.
 
-Not found (recorded, not fabricated): no security.txt, no OAuth/OIDC discovery, no RFC 9728 metadata, no api-catalog, no apis.json, no status page, no outbound webhooks or AsyncAPI, no SDKs, no CLI, no sandbox/test values, no WSDL or protobuf.
+### APIs (17)
+
+- [Numbers Online MCP Server](https://apis.io/apis/numbers-online/numbers-online-mcp-server/) — A hosted, stateless, read-only Model Context Protocol server (JSON-RPC 2.0 over Streamable HTTP, protocol 2025-06-18) at POST…
+- [Numbers Online A2A Agent](https://apis.io/apis/numbers-online/numbers-online-a2a-agent/) — An Agent-to-Agent (A2A protocolVersion 0.3.0, JSONRPC) endpoint at POST https://numbers.online/api/v1/a2a exposing four read-only skills — phone_lookup,…
+- [Numbers Online Account API](https://apis.io/apis/numbers-online/numbers-online-account-api/) — Self-service API account: signup, balance, usage, credit top-ups, and the key lifecycle. Account-management endpoints require an account-level key with the…
+- [Numbers Online Community reporting API](https://apis.io/apis/numbers-online/numbers-online-community-reporting-api/) — Key-gated spam/scam reporting — the give-to-get half of the community sensor (receipt-gated, tags-only, lane-scoped supplementary signals)
+- [Numbers Online Inbound API](https://apis.io/apis/numbers-online/numbers-online-inbound-api/) — Inbound caller-intelligence lookup for operators, PBX, and softphones
+- [Numbers Online Lookup API](https://apis.io/apis/numbers-online/numbers-online-lookup-api/) — Number lookup: line type, range carrier, CNAM, verstat, and a supplementary spam signal
+- [Numbers Online MCP API](https://apis.io/apis/numbers-online/numbers-online-mcp-api/) — Model Context Protocol server for AI voice agents (Vapi, Retell, Pipecat, LiveKit): read-only phone-intelligence tools over Streamable HTTP
+- [Numbers Online MSP API](https://apis.io/apis/numbers-online/numbers-online-msp-api/) — Multi-tenant control plane: per-tenant sub-keys, usage rollups, and suppression lists for MSPs and PBX resellers
+- [Numbers Online Outbound API](https://apis.io/apis/numbers-online/numbers-online-outbound-api/) — Outbound pre-call checks (scrub + call-provenance) and number enrollment for spoofing-defense
+- [Numbers Online Parsing API](https://apis.io/apis/numbers-online/numbers-online-parsing-api/) — Phone number parsing and validation endpoints
+- [Numbers Online PBX API](https://apis.io/apis/numbers-online/numbers-online-pbx-api/) — Plain-text caller-id lookup for header-less PBX integrations (FreeSWITCH mod_cidlookup and similar)
+- [Numbers Online Receipts API](https://apis.io/apis/numbers-online/numbers-online-receipts-api/) — Signed, privacy-safe lookup receipts (Ed25519) — verifiable "checked as of T" evidence
+- [Numbers Online Reference API](https://apis.io/apis/numbers-online/numbers-online-reference-api/) — Reference data and examples
+- [Numbers Online SBC / SIP API](https://apis.io/apis/numbers-online/numbers-online-sbc-sip-api/) — SIP redirect-server decisions for session border controllers (Kamailio, OpenSIPS, dSIPRouter, Sansay, Oracle/Acme Packet, ProSBC) via the operator-run shim…
+- [Numbers Online System API](https://apis.io/apis/numbers-online/numbers-online-system-api/) — Operational endpoints (health checks)
+- [Numbers Online Trust API](https://apis.io/apis/numbers-online/numbers-online-trust-api/) — Contact-suppression preference lookups
+- [Numbers Online Webhooks API](https://apis.io/apis/numbers-online/numbers-online-webhooks-api/) — AI-voice-agent webhook adapters (Retell inbound, Vapi custom tool) over the same lookup backend
+
+### Published properties
+
+Each property below is a page on APIs.io carrying the machine-readable artifact and what it says.
+
+#### MCP servers (1)
+
+Model Context Protocol servers that expose the API to agents.
+
+- [numbers-online-mcp.yml](https://apis.io/servers/numbers-online/numbers-online-mcp-yml/)
+
+#### Agentic access (1)
+
+Which operations an agent can call, which act, and which need a human in the loop.
+
+- [Numbers Online Agentic Access](https://apis.io/agentic-access/numbers-online/numbers-online-agentic-access/)
+
+#### Overlays (1)
+
+OpenAPI overlays, including conversational phrasing for each operation.
+
+- [Numbers Online Openapi Overlay](https://apis.io/overlays/numbers-online/numbers-online-openapi-overlay/)
+
+#### Security (2)
+
+Authentication, trust centre, and vulnerability disclosure.
+
+- [Numbers Online Authentication](https://apis.io/security/numbers-online/numbers-online-authentication/)
+- [Numbers Online Domain Security](https://apis.io/security/numbers-online/numbers-online-domain-security/)
+
+#### Plans and pricing (1)
+
+Published plans, tiers and prices.
+
+- [Numbers Online Plans Pricing](https://apis.io/plans/numbers-online/numbers-online-plans-pricing/)
+
+#### Rate limits (1)
+
+Published request limits.
+
+- [Numbers Online Rate Limits](https://apis.io/rate-limits/numbers-online/numbers-online-rate-limits/)
+
+## Where to find this API
+
+Links to the company's own pages. This repository publishes no copy of their specifications — the canonical document is theirs and lives at the URLs below.
+
+- [Website](https://numbers.online/)
+- [Documentation](https://numbers.online/docs)
+- [Getting started](https://numbers.online/developers)
+- [API reference](https://numbers.online/docs)
+- [Pricing](https://numbers.online/pricing)
+- [Sign up](https://numbers.online/developers)
+- [Support](https://numbers.online/concierge)
+- [Changelog](https://numbers.online/api/spec)
+- [Terms of service](https://numbers.online/terms)
+- [Privacy policy](https://numbers.online/privacy)
+- [GitHub](https://github.com/numbers-online)
+
+## API Evangelist rating
+
+**Kin Score 60.4** — strong · rubric 0.25.0 · scored 2026-10-23
+
+| Facet | Score |
+|---|---|
+| Discoverability | 75.0 |
+| Contract quality | 48.5 |
+| Contract governance | 18.2 |
+| Operational transparency | 60.5 |
+| Developer ergonomics | 56.5 |
+| Access clarity | 84.2 |
+
+**Agent readiness 49.0** — agent-native
+
+| Agent-readiness dimension | Result |
+|---|---|
+| Spec Presence | yes |
+| Agentic Access | derived (partial credit) |
+| Reversibility Documented | — |
+| MCP Server | documented (partial credit) |
+| Auth Clarity | bearer (partial credit) |
+| Idempotency | verified |
+| Error Semantics | verified |
+| OpenAPI Examples | verified |
+| Rate Limit Signal | verified |
+| Event Surface Described | — |
+| Agent Skills | derived (partial credit) |
+| Well Known Catalog | — |
+| Consent Identity | — |
+| Agent Card | conformant |
+| Dry Run Mode | — |
+| Delegated Identity | — |
+| Protected Resource Metadata | — |
+| Dynamic Client Registration | — |
+| Agentic Commerce | — |
+| Pagination Ratio | — |
+| Operation Distinctiveness | distinct |
+
+**Regulatory alignment 37.3** — Horizontal (data, software, accessibility, platform)
+
+The rubric is published at [github.com/api-evangelist/kin-score](https://github.com/api-evangelist/kin-score). The per-check breakdown behind these numbers — which checks were earned, partial or missed — along with score history and how this provider compares to its peers, is available at [apis.io/providers/numbers-online/](https://apis.io/providers/numbers-online/).
+
+## How this profile is made
+
+API Evangelist profiles a company's public API surface the way a developer would find it: the website, developer portal and documentation, the specifications it publishes, its public repositories, and its pricing, status and changelog pages. From that it derives the properties above — contracts split per API, workflows, schemas, collections, governance rules, plans and rate limits — and scores them against the published [Kin Score rubric](https://github.com/api-evangelist/kin-score).
+
+The artifacts are published on [APIs.io](https://apis.io), not in this repository. This repository is the public record for Numbers Online: the place to say something is wrong, missing or out of date, and to ask for a re-score or a removal.
+
+## Open an issue
+
+- **Something about this listing** — a wrong description, a missing API, a stale artifact or a question about the rating: [open an issue on this repository](https://github.com/api-evangelist/numbers-online/issues/new).
+- **A new API, or one that is not in the catalog yet** — [submit it on APIs.io](https://apis.io/add/).
+- **Anything else** — [the APIs.io inbox](https://github.com/api-search/inbox/issues/new) or [info@apievangelist.com](mailto:info@apievangelist.com).
